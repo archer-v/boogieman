@@ -65,31 +65,6 @@ func TestPOpenvpnConnect_Runner(t *testing.T) {
 			t.Errorf("something got wrong with stopping openvpn server process")
 		}
 	}
-	/*
-		c := New(options, )
-		if c.Runner(ctx) || !strings.Contains(c.Error().Error(), "Unrecognized option") {
-			t.Errorf("Probe runner 1 should finihed with error 'Unrecognized option'")
-		}
-
-		c = New(options, )
-		if c.Runner(ctx) || !strings.Contains(c.Error().Error(), "can't get remote addr") {
-			t.Errorf("Probe runner 2 should finihed with error 'can't get remote addr'")
-		}
-
-		c = New(options, )
-		if c.Runner(ctx) {
-			t.Errorf("Probe runner 3 should finihed with error")
-		}
-		c.Finish()
-
-		c = New(options, )
-		if !c.Runner(ctx) {
-			t.Errorf("Probe runner 4 should finihed with success")
-		}
-		c.Finish()
-
-	*/
-
 }
 
 func testStartOpenvpnServer(ctx context.Context) (runner *cmd.Cmd) {
