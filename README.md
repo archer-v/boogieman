@@ -11,7 +11,7 @@ Available checks (probes):
 - cmd (in development)
 - netroute (in development)
 - netport (in development)
-Additional probes can be created.
+- any additional probes can be created
 
 Working modes
 - console mode: it returns the check result in exit code and stdout message.
