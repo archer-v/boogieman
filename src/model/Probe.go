@@ -42,13 +42,13 @@ func (s *ProbeOptions) UnmarshalJSON(b []byte) (err error) {
 	return
 }
 
-type Runner func(ctx context.Context) (succ bool)
+type ProbeRunner func(ctx context.Context) (succ bool)
 
 type ProbeHandler struct {
 	ProbeOptions
 	Name string // probe name
 	//Configuration any
-	runner     Runner                   // probe runner
+	runner     ProbeRunner              // probe runner
 	startedAt  time.Time                // last startup timestamp
 	duration   time.Duration            // last run duration
 	finished   bool                     // probing is finished
@@ -114,7 +114,7 @@ func (c *ProbeHandler) SetError(err error) *ProbeHandler {
 }
 
 // SetRunner sets the probe runner, should be called internally from the probe on init
-func (c *ProbeHandler) SetRunner(r Runner) *ProbeHandler {
+func (c *ProbeHandler) SetRunner(r ProbeRunner) *ProbeHandler {
 	c.runner = r
 	return c
 }

@@ -32,6 +32,7 @@ type Probe struct {
 }
 
 func ymlConfiguration(data []byte) (s model.Script, err error) {
+	s = model.NewScript()
 	parsed := Script{}
 	if err = defaults.Set(&parsed); err != nil {
 		return

@@ -71,15 +71,11 @@ func StartupConfiguration() (script model.Script, err error) {
 		if err != nil {
 			return
 		}
-		sc := model.Task{
-			Probe: p,
-		}
 
-		script = model.Script{
-			Tasks: []*model.Task{
-				&sc,
-			},
-		}
+		script = model.NewScript()
+		script.AddTask(&model.Task{
+			Probe: p,
+		})
 	}
 
 	if c.CheckList != "" {
