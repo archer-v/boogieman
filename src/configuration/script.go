@@ -1,11 +1,11 @@
 package configuration
 
 import (
+	"boogieman/src/model"
+	"boogieman/src/probeFactory"
 	"encoding/json"
 	"fmt"
 	"github.com/creasty/defaults"
-	"liberator-check/src/model"
-	"liberator-check/src/probeFactory"
 	"sigs.k8s.io/yaml" // uses it instead gopkg.in/yaml.v3 as it also supports json attributes in struct
 	"time"
 )
@@ -17,8 +17,10 @@ type Script struct {
 }
 
 type Record struct {
-	Name  string
-	Probe Probe
+	Name   string
+	Probe  Probe
+	CGroup string
+	//DependsOn      string
 }
 
 type Probe struct {
@@ -39,9 +41,9 @@ func ymlConfiguration(data []byte) (s model.Script, err error) {
 	}
 
 	s.Daemon = parsed.Daemon
-	s.Tasks = make([]*model.Task, len(parsed.Script))
+	//s.Tasks = make([]*model.Task, len(parsed.Script))
 	var p model.Prober
-	for i, v := range parsed.Script {
+	for _, v := range parsed.Script {
 		var config any
 		// get the probe configuration struct
 		config, err = probeFactory.NewProbeConfiguration(v.Probe.Name)
@@ -63,10 +65,7 @@ func ymlConfiguration(data []byte) (s model.Script, err error) {
 			err = fmt.Errorf("[%v] %w", v.Name, err)
 			return
 		}
-		s.Tasks[i] = &model.Task{
-			Name:  v.Name,
-			Probe: p,
-		}
+		s.AddTask(model.NewTask(v.Name, v.CGroup, p))
 	}
 	return
 }
