@@ -15,7 +15,7 @@ Additional probes can be created.
 
 Working modes
 - console mode: it returns the check result in exit code and stdout message.
-- http daemon: receive script in post request and returns a response object object when check is finished
+- http daemon: receives a script as a post request and returns a response object object when check is finished
 - continuos monitoring mode: perform regular checks and exposes the results as prometheus metrics or json object.
 
 All probes in a scenario can be executed simultaneously so the entire scenario can perform quickly. Configurable timeouts are supported for all checks. 
