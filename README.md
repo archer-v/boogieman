@@ -18,7 +18,7 @@ In daemon mode it exposes the results as prometheus metrics or json object
 
 Scenario file example:
 
-`
+```
 script:
   - name: gateway-alive
     probe:
@@ -55,5 +55,4 @@ script:
         timeout: 5000
       configuration:
         configFile: src/probes/openvpnConnect/test/openvpn-client.ovpn
-
-`
+```
