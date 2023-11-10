@@ -1,9 +1,9 @@
 package probeFactory
 
 import (
+	"boogieman/src/model"
 	"errors"
 	"fmt"
-	"liberator-check/src/model"
 )
 
 var probes map[string]Constructor

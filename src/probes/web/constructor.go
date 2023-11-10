@@ -1,8 +1,8 @@
 package web
 
 import (
-	"liberator-check/src/model"
-	"liberator-check/src/probeFactory"
+	"boogieman/src/model"
+	"boogieman/src/probeFactory"
 	"regexp"
 )
 

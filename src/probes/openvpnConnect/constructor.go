@@ -1,9 +1,9 @@
 package openvpnConnect
 
 import (
+	"boogieman/src/model"
+	"boogieman/src/probeFactory"
 	"fmt"
-	"liberator-check/src/model"
-	"liberator-check/src/probeFactory"
 	"os"
 )
 

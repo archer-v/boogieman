@@ -25,6 +25,8 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/prometheus-community/pro-bing v0.3.0 h1:SFT6gHqXwbItEDJhTkzPWVqU6CLEtqEfNAPp47RUON4=
 github.com/prometheus-community/pro-bing v0.3.0/go.mod h1:p9dLb9zdmv+eLxWfCT6jESWuDrS+YzpPkQBgysQF8a0=
+github.com/starshiptroopers/uidgenerator v0.0.4 h1:LpA0VhAeJtkcMe9ZIS+rL7HPnrqQzkAW29XgLUipqb0=
+github.com/starshiptroopers/uidgenerator v0.0.4/go.mod h1:KAwD7wTK/0x6/g5wRJ90OQv0SltrlLBqi2kL0gAW/ow=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.4.0/go.mod h1:YvHI0jy2hoMjB+UWwv71VJQ9isScKT/TqJzVSSt89Yw=
 github.com/stretchr/objx v0.5.0/go.mod h1:Yh+to48EsGEfYuaHDzXPcE3xhTkx73EhmCGUpEOglKo=

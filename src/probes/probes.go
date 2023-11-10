@@ -1,7 +1,7 @@
 package probes
 
 import (
-	_ "liberator-check/src/probes/openvpnConnect"
-	_ "liberator-check/src/probes/ping"
-	_ "liberator-check/src/probes/web"
+	_ "boogieman/src/probes/openvpnConnect"
+	_ "boogieman/src/probes/ping"
+	_ "boogieman/src/probes/web"
 )

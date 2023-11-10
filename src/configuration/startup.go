@@ -1,13 +1,13 @@
 package configuration
 
 import (
+	"boogieman/src/model"
+	"boogieman/src/probeFactory"
+	_ "boogieman/src/probes"
 	"errors"
 	"fmt"
 	"github.com/integrii/flaggy"
 	"github.com/vrischmann/envconfig"
-	"liberator-check/src/model"
-	"liberator-check/src/probeFactory"
-	_ "liberator-check/src/probes"
 	"os"
 	"time"
 )

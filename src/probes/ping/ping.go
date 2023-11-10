@@ -1,12 +1,12 @@
 package ping
 
 import (
+	"boogieman/src/model"
+	"boogieman/src/probeFactory"
 	"context"
 	"errors"
 	"fmt"
 	"github.com/prometheus-community/pro-bing"
-	"liberator-check/src/model"
-	"liberator-check/src/probeFactory"
 	"strings"
 	"sync"
 	"time"

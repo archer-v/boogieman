@@ -1,8 +1,8 @@
 package runner
 
 import (
+	"boogieman/src/model"
 	"context"
-	"liberator-check/src/model"
 	"time"
 )
 

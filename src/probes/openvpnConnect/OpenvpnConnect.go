@@ -1,13 +1,13 @@
 package openvpnConnect
 
 import (
+	"boogieman/src/model"
+	"boogieman/src/probeFactory"
+	"boogieman/src/util"
 	"context"
 	"errors"
 	"fmt"
 	"github.com/go-cmd/cmd"
-	"liberator-check/src/model"
-	"liberator-check/src/probeFactory"
-	"liberator-check/src/util"
 	"log"
 	"strings"
 	"syscall"

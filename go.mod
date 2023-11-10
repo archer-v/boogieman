@@ -7,6 +7,7 @@ require (
 	github.com/go-cmd/cmd v1.3.0
 	github.com/integrii/flaggy v1.5.2
 	github.com/prometheus-community/pro-bing v0.3.0
+	github.com/starshiptroopers/uidgenerator v0.0.4
 	github.com/vrischmann/envconfig v1.3.0
 	sigs.k8s.io/yaml v1.4.0
 )

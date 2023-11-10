@@ -1,8 +1,8 @@
 package probeFactory
 
 import (
+	"boogieman/src/model"
 	"github.com/creasty/defaults"
-	"liberator-check/src/model"
 )
 
 type BaseConstructor struct {

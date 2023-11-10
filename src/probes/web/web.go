@@ -1,11 +1,11 @@
 package web
 
 import (
+	"boogieman/src/model"
+	"boogieman/src/probeFactory"
 	"context"
 	"errors"
 	"fmt"
-	"liberator-check/src/model"
-	"liberator-check/src/probeFactory"
 	"net/http"
 	"net/url"
 	"strings"

@@ -1,10 +1,10 @@
 package openvpnConnect
 
 import (
+	"boogieman/src/model"
 	"context"
 	"fmt"
 	"github.com/go-cmd/cmd"
-	"liberator-check/src/model"
 	"log"
 	"os"
 	"testing"

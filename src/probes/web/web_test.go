@@ -1,9 +1,9 @@
 package web
 
 import (
+	"boogieman/src/model"
 	"context"
 	"fmt"
-	"liberator-check/src/model"
 	"testing"
 	"time"
 )

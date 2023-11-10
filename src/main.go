@@ -1,10 +1,10 @@
 package main
 
 import (
+	"boogieman/src/configuration"
+	"boogieman/src/runner"
 	"context"
 	"fmt"
-	"liberator-check/src/configuration"
-	"liberator-check/src/runner"
 	"os"
 )
 
