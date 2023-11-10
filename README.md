@@ -13,8 +13,12 @@ Available checks (probes):
 - netport (in development)
 Additional probes can be created.
 
-If boogieman is started in console mode, it returns the check result in exit code and stdout message. 
-In daemon mode it exposes the results as prometheus metrics or json object
+Working modes
+- console mode: it returns the check result in exit code and stdout message.
+- http daemon: receive script in post request and returns a response object object when check is finished
+- continuos monitoring mode: perform regular checks and exposes the results as prometheus metrics or json object.
+
+All probes in a scenario can be executed simultaneously so the entire scenario can perform quickly. Configurable timeouts are supported for all checks. 
 
 Scenario file example:
 
@@ -56,3 +60,4 @@ script:
       configuration:
         configFile: src/probes/openvpnConnect/test/openvpn-client.ovpn
 ```
+
