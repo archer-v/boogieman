@@ -87,9 +87,6 @@ func (r *Runner) runCgroup(ctx context.Context, cgroup *model.CGroup) (succ bool
 				wg.Done()
 			}()
 
-			if task.Name == "vpn-tunnel-alive" {
-				r.Log("catch")
-			}
 			_, err := task.Start(ctx)
 			if err != nil {
 				r.Log("[task][%v] %v", task.Name, err.Error())
