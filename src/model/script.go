@@ -41,9 +41,6 @@ func (t *Task) Start(ctx context.Context) (succ bool, err error) {
 		return
 	}
 	succ = t.Probe.Start(context.WithValue(ctx, "id", t.Name))
-	if t.Probe.IsAlive() {
-		// todo add the Finish() call to cleanup flow
-	}
 	err = t.EStatusFinish(succ)
 	return
 }

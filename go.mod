@@ -4,6 +4,7 @@ go 1.21
 
 require (
 	github.com/creasty/defaults v1.7.0
+	github.com/enriquebris/goconcurrentqueue v0.7.0
 	github.com/go-cmd/cmd v1.3.0
 	github.com/integrii/flaggy v1.5.2
 	github.com/prometheus-community/pro-bing v0.3.0

@@ -3,15 +3,17 @@ package runner
 import (
 	"boogieman/src/model"
 	"context"
+	"github.com/enriquebris/goconcurrentqueue"
 	"log"
 	"sync"
 	"time"
 )
 
 type Runner struct {
-	script   model.Script
-	Result   ScriptResult
-	Progress Progress
+	script            model.Script
+	Result            ScriptResult
+	Progress          Progress
+	probesStayedAlive *goconcurrentqueue.FIFO
 }
 
 type ScriptResult struct {
@@ -37,7 +39,8 @@ type Progress struct {
 
 func NewRunner(script model.Script) Runner {
 	return Runner{
-		script: script,
+		script:            script,
+		probesStayedAlive: goconcurrentqueue.NewFIFO(),
 	}
 }
 
@@ -47,8 +50,8 @@ func (r *Runner) Run(ctx context.Context) {
 		return
 	}
 
-	for _, cgroup := range r.script.CGroups {
-		r.runCgroup(ctx, cgroup)
+	for _, cGroup := range r.script.CGroups {
+		r.runCgroup(ctx, cGroup)
 	}
 
 	succ := true
@@ -57,6 +60,15 @@ func (r *Runner) Run(ctx context.Context) {
 	}
 
 	_ = r.script.EStatusFinish(succ)
+
+	for i, e := r.probesStayedAlive.Dequeue(); e == nil; i, e = r.probesStayedAlive.Dequeue() {
+		probe, ok := i.(model.Prober)
+		if !ok {
+			r.Log("wrong queue object type")
+			continue
+		}
+		probe.Finish(ctx)
+	}
 }
 
 func (r *Runner) runCgroup(ctx context.Context, cgroup *model.CGroup) (succ bool) {
@@ -66,36 +78,27 @@ func (r *Runner) runCgroup(ctx context.Context, cgroup *model.CGroup) (succ bool
 	}
 
 	ctx = context.WithValue(ctx, "cgroup", cgroup.Name)
-	//r.Progress.RunnerStartedAt = time.Now()
-	//r.Result.Checks = make([]CheckResult, len(r.script.Tasks))
+
 	var wg sync.WaitGroup
 	for _, task := range cgroup.Tasks {
-
-		/*
-			//r.Progress.Idx = i
-			//r.Progress.Check = task
-			//r.Progress.CheckStartedAt = time.Now()
-
-			r.Result.Checks[i] = CheckResult{
-				Name:     task.Name,
-				Runtime: 0,
-				Timings:  nil,
-			}
-		*/
 		wg.Add(1)
 		go func(task *model.Task) {
 			defer func() {
 				wg.Done()
 			}()
 
+			if task.Name == "vpn-tunnel-alive" {
+				r.Log("catch")
+			}
 			_, err := task.Start(ctx)
 			if err != nil {
 				r.Log("[task][%v] %v", task.Name, err.Error())
 			}
-			//task.Probe.Finish()
-		}(task)
 
-		//r.Result.Checks[i].Timings = task.Probe.TimeStat()
+			if task.Probe.IsAlive() {
+				_ = r.probesStayedAlive.Enqueue(task.Probe)
+			}
+		}(task)
 	}
 	wg.Wait()
 	succ = true
