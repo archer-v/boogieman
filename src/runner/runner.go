@@ -78,7 +78,7 @@ func (r *Runner) runCgroup(ctx context.Context, cgroup *model.CGroup) (succ bool
 
 			r.Result.Checks[i] = CheckResult{
 				Name:     task.Name,
-				Duration: 0,
+				Runtime: 0,
 				Timings:  nil,
 			}
 		*/
@@ -92,6 +92,7 @@ func (r *Runner) runCgroup(ctx context.Context, cgroup *model.CGroup) (succ bool
 			if err != nil {
 				r.Log("[task][%v] %v", task.Name, err.Error())
 			}
+			//task.Probe.Finish()
 		}(task)
 
 		//r.Result.Checks[i].Timings = task.Probe.TimeStat()

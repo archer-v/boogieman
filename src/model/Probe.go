@@ -43,19 +43,19 @@ func (s *ProbeOptions) UnmarshalJSON(b []byte) (err error) {
 }
 
 type ProbeRunner func(ctx context.Context) (succ bool)
+type ProbeFinisher func(ctx context.Context)
 
 type ProbeHandler struct {
 	ProbeOptions
-	Name string // probe name
-	//Configuration any
-	runner     ProbeRunner              // probe runner
-	startedAt  time.Time                // last startup timestamp
-	duration   time.Duration            // last run duration
-	finished   bool                     // probing is finished
-	success    bool                     // probing is success
-	timings    map[string]time.Duration // timings data
-	logContext string                   // log prefix string
-	error      error                    // last startup error
+	Runner
+	Result
+	Name              string // probe name
+	CanStayBackground bool
+	runner            ProbeRunner              // probe runner
+	finisher          ProbeFinisher            // probe finisher, only for probe that stays alive in background
+	timings           map[string]time.Duration // timings data
+	logContext        string                   // log prefix string
+	error             error                    // last startup error
 	sync.Mutex
 }
 
@@ -65,46 +65,30 @@ func (c *ProbeHandler) Start(ctx context.Context) (succ bool) {
 		c.Log("runner isn't defined")
 		return
 	}
-	c.startedAt = time.Now()
-	c.finished = false
-	c.success = false
-	c.duration = 0
+	if err := c.EStatusRun(); err != nil {
+		c.Log("wrong runner status: %v", err.Error())
+	}
+	c.Result.PrepareToStart()
 	if ctx != nil && ctx.Value("id") != nil {
 		c.SetLogContext(ctx.Value("id").(string))
 	}
-	return c.runner(ctx)
-}
+	succ = c.runner(ctx)
 
-// Duration returns duration of current or last finished probing
-func (c *ProbeHandler) Duration() time.Duration {
-	if c.duration == 0 && c.startedAt != (time.Time{}) {
-		return time.Since(c.startedAt)
+	c.Result.End(succ)
+
+	// todo do not clear && messy, need refactor
+	if !c.CanStayBackground || !succ || c.Error() != nil || !c.StayAlive {
+		_ = c.EStatusFinish(succ)
 	}
-	return c.duration
-}
 
-// Finished fixes the result of probing, should be called internally from the probe
-func (c *ProbeHandler) Finished(success bool) {
-	c.finished = true
-	c.success = success
-	if success {
+	if succ {
 		c.Log("SUCCESS")
 	} else {
 		c.Log("FAIL")
 	}
-
 	c.SetLogContext("")
-	if c.startedAt != (time.Time{}) {
-		c.duration = time.Since(c.startedAt)
-	} else {
-		c.duration = 0
-	}
-}
 
-// SetDuration sets probing duration, should be called internally from the probe
-func (c *ProbeHandler) SetDuration(d time.Duration) *ProbeHandler {
-	c.duration = d
-	return c
+	return
 }
 
 // SetError sets probing error, should be called internally from the probe
@@ -113,9 +97,15 @@ func (c *ProbeHandler) SetError(err error) *ProbeHandler {
 	return c
 }
 
-// SetRunner sets the probe runner, should be called internally from the probe on init
+// SetRunner sets the probe runner, should be set from the probe on init
 func (c *ProbeHandler) SetRunner(r ProbeRunner) *ProbeHandler {
 	c.runner = r
+	return c
+}
+
+// SetFinisher sets the probe finishing method, should be set from the probe on init
+func (c *ProbeHandler) SetFinisher(f ProbeFinisher) *ProbeHandler {
+	c.finisher = f
 	return c
 }
 
@@ -159,19 +149,25 @@ func (c *ProbeHandler) SetLogContext(ctx string) {
 }
 
 // Finish is just a stub for probe that should fit the Prober interface but doesn't have a Finish method itself
-func (c *ProbeHandler) Finish() {
-
+func (c *ProbeHandler) Finish(ctx context.Context) {
+	if c.finisher != nil {
+		c.finisher(ctx)
+	}
+	_ = c.EStatusFinish(true)
 }
 
 func (c *ProbeHandler) Error() error {
 	return c.error
 }
 
+func (c *ProbeHandler) IsAlive() bool {
+	return c.Runner.EStatus == EStatusRunning
+}
+
 type Prober interface {
 	Start(ctx context.Context) (succ bool)
-	Duration() time.Duration
-	TimeStat() map[string]time.Duration
+	Finish(ctx context.Context)
 	Error() error
-	//Finished(success bool)
-	Finish()
+	IsAlive() bool
+	TimeStat() map[string]time.Duration
 }

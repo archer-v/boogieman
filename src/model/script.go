@@ -2,19 +2,8 @@ package model
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"github.com/starshiptroopers/uidgenerator"
-	"sync"
 	"time"
-)
-
-type EStatus string
-
-const (
-	EStatusFinished EStatus = "finished"
-	EStatusNew      EStatus = "new"
-	EStatusRunning  EStatus = "running"
 )
 
 var uidGenerator *uidgenerator.UIDGenerator
@@ -52,26 +41,34 @@ func (t *Task) Start(ctx context.Context) (succ bool, err error) {
 		return
 	}
 	succ = t.Probe.Start(context.WithValue(ctx, "id", t.Name))
+	if t.Probe.IsAlive() {
+		// todo add the Finish() call to cleanup flow
+	}
 	err = t.EStatusFinish(succ)
 	return
 }
 
 type Result struct {
 	StartedAt time.Time
-	Duration  time.Duration
+	Runtime   time.Duration
 	Success   bool
+}
+
+func (r *Result) PrepareToStart() {
+	r.Success = false
+	r.StartedAt = time.Now()
+	r.Runtime = 0
+}
+
+func (r *Result) End(succ bool) {
+	r.Runtime = time.Since(r.StartedAt)
+	r.Success = succ
 }
 
 type CGroup struct {
 	Name string
 	Runner
 	Tasks []*Task
-}
-
-type Runner struct {
-	Result
-	EStatus
-	sync.Mutex
 }
 
 func (c *CGroup) addTask(task *Task) {
@@ -114,31 +111,6 @@ func (s *Script) AddTask(t *Task) {
 		}
 	}
 	s.Tasks = append(s.Tasks, t)
-}
-
-func (s *Runner) EStatusRun() (err error) {
-	s.Lock()
-	defer s.Unlock()
-	if s.EStatus == EStatusRunning {
-		return errors.New("already " + string(s.EStatus))
-	}
-	s.EStatus = EStatusRunning
-	s.Success = false
-	s.StartedAt = time.Now()
-	s.Duration = 0
-	return
-}
-
-func (s *Runner) EStatusFinish(succ bool) (err error) {
-	s.Lock()
-	defer s.Unlock()
-	if s.EStatus != EStatusRunning {
-		return fmt.Errorf("can't switch from status %v to %v", string(s.EStatus), string(EStatusFinished))
-	}
-	s.EStatus = EStatusFinished
-	s.Duration = time.Since(s.StartedAt)
-	s.Success = succ
-	return
 }
 
 func NewTask(taskName string, cgroup string, probe Prober) (t *Task) {
