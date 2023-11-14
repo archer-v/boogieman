@@ -45,15 +45,15 @@ script:
       name: openvpnConnect
       options:
         timeout: 5000
+        stayAlive: true
       configuration:
         configFile: src/probes/openvpnConnect/test/openvpn-client.ovpn
   - name: vpn-tunnel-alive
-    cgroup: 2
+    cgroup: 3
     probe:
       name: ping
       options:
         timeout: 500
       configuration:
         hosts:
-          - 10.8.0.1
-    dependsOn: vpn-connect
+          - 192.168.165.1
