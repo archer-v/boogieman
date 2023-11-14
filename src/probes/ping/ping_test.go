@@ -11,7 +11,7 @@ import (
 func TestPing_Runner(t *testing.T) {
 
 	ctx := context.Background()
-	options := model.ProbeOptions{Timeout: time.Millisecond * 2000}
+	options := model.ProbeOptions{Timeout: time.Millisecond * 2000, Expect: true}
 
 	type testCase struct {
 		config         Config

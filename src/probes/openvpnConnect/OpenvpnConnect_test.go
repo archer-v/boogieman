@@ -19,7 +19,7 @@ var (
 
 func TestPOpenvpnConnect_Runner(t *testing.T) {
 	ctx := context.Background()
-	options := model.ProbeOptions{Timeout: time.Millisecond * 2000}
+	options := model.ProbeOptions{Timeout: time.Millisecond * 2000, Expect: true}
 
 	type testCase struct {
 		config         Config
@@ -28,19 +28,23 @@ func TestPOpenvpnConnect_Runner(t *testing.T) {
 
 	cases := []testCase{
 		{
-			Config{ConfigFile: "empty\nremote 1.1.1.1 1000"},
+			Config{ConfigData: "empty\nremote 1.1.1.1 1000", LogDump: false},
 			false,
 		},
 		{
-			Config{ConfigFile: "empty"},
+			Config{ConfigData: "empty"},
 			false,
 		},
 		{
-			Config{ConfigFile: testReadConfig(openvpnClientTestWrongConfigPath)},
+			Config{ConfigData: testReadConfig(openvpnClientTestWrongConfigPath)},
 			false,
 		},
 		{
-			Config{ConfigFile: testReadConfig(openvpnClientTestConfigPath)},
+			Config{ConfigData: testReadConfig(openvpnClientTestConfigPath)},
+			true,
+		},
+		{
+			Config{ConfigFile: openvpnClientTestConfigPath},
 			true,
 		},
 	}
@@ -55,7 +59,7 @@ func TestPOpenvpnConnect_Runner(t *testing.T) {
 		if p.Start(context.WithValue(ctx, "id", fmt.Sprintf("test %v", i+1))) != c.expectedResult {
 			t.Errorf("Probe runner %v should return %v", i, c.expectedResult)
 		} else {
-			p.Finish()
+			p.Finish(ctx)
 		}
 	}
 

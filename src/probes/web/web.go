@@ -87,6 +87,5 @@ func (c *Probe) Runner(ctx context.Context) (succ bool) {
 	}
 	wg.Wait()
 	succ = done == len(c.Urls)
-	c.Finished(succ)
 	return
 }

@@ -4,6 +4,7 @@ import (
 	"boogieman/src/model"
 	"context"
 	"fmt"
+	"net/http"
 	"testing"
 	"time"
 )
@@ -11,7 +12,7 @@ import (
 func TestWeb_Runner(t *testing.T) {
 
 	ctx := context.Background()
-	options := model.ProbeOptions{Timeout: time.Millisecond * 5000}
+	options := model.ProbeOptions{Timeout: time.Millisecond * 5000, Expect: true}
 
 	type testCase struct {
 		config         Config
@@ -20,19 +21,23 @@ func TestWeb_Runner(t *testing.T) {
 
 	cases := []testCase{
 		{
-			Config{Urls: []string{"https://google.com/", "https://google.com/robots.txt"}},
+			Config{Urls: []string{"https://google.com/", "https://google.com/robots.txt"}, HttpStatus: http.StatusOK},
 			true,
 		},
 		{
-			Config{Urls: []string{"https://google.com/"}},
+			Config{Urls: []string{"https://google.com/"}, HttpStatus: http.StatusOK},
 			true,
 		},
 		{
-			Config{Urls: []string{"https://google.com/fail"}},
+			Config{Urls: []string{"https://google.com/fail"}, HttpStatus: http.StatusOK},
 			false,
 		},
 		{
-			Config{Urls: []string{"https://google.com/", "https://google.com/fail"}},
+			Config{Urls: []string{"https://google.com/fail"}, HttpStatus: http.StatusNotFound},
+			true,
+		},
+		{
+			Config{Urls: []string{"https://google.com/", "https://google.com/fail"}, HttpStatus: http.StatusOK},
 			false,
 		},
 	}

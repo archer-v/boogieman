@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/go-cmd/cmd"
 	"log"
+	"os"
 	"strings"
 	"syscall"
 	"time"
@@ -44,71 +45,89 @@ func New(options model.ProbeOptions, config Config) *Probe {
 	p.ProbeOptions = options
 	p.Name = name
 	p.Config = config
-	p.SetRunner(p.Runner)
+	p.CanStayBackground = true
+	p.SetRunner(p.Runner).SetFinisher(p.Finisher)
 	return &p
 }
 
 func (c *Probe) Runner(ctx context.Context) (succ bool) {
+	var (
+		host           string
+		configFileName string
+		err            error
+	)
+
+	defer func() {
+		if err != nil {
+			c.Log("[%v] %v, %vms", host, err, c.Duration().Milliseconds())
+			c.SetError(err)
+		} else {
+			c.Log("[%v] OK, %vms", host, c.Duration().Milliseconds())
+		}
+	}()
+
 	if c.cmd != nil {
-		c.SetError(fmt.Errorf("another openvpn is still running by this probe"))
+		err = fmt.Errorf("another openvpn is still running by this probe")
 		return
 	}
 
-	var configFileName string
-	var err error
 	if c.ConfigFile != "" {
 		configFileName = c.ConfigFile
+		configData, e := os.ReadFile(configFileName)
+		if e != nil {
+			err = fmt.Errorf("can't read openvpn config: %v", e)
+			return
+		}
+		host = hostFromConfigData(string(configData))
 	} else {
 		configFileName, err = util.StringToFile(c.ConfigData)
 		if err != nil {
 			err = fmt.Errorf("can't create temporary file with openvpn config: %v", err)
-			c.SetError(err)
 			return
 		}
 		defer func() {
-			err = syscall.Unlink(configFileName)
-			if err != nil {
-				c.Log("can't remove tmpFile %v: %v", configFileName, err)
+			e := syscall.Unlink(configFileName)
+			if e != nil {
+				c.Log("can't remove tmpFile %v: %v", configFileName, e)
 			}
 		}()
-	}
-
-	var host string
-	for _, l := range strings.Split(c.ConfigData, "\n") {
-		if strings.Contains(l, "remote") {
-			args := strings.Split(l, " ")
-			if len(args) == 3 {
-				host = args[1] + ":" + args[2]
-			}
-		}
+		host = hostFromConfigData(c.ConfigData)
 	}
 
 	if host == "" {
 		err = errors.New("can't get remote addr from openvpn configuration")
-		c.SetError(err)
 		return
 	}
 
-	c.SetLogContext(host)
 	c.cmd, err = openvpnStart(ctx, configFileName, c.Timeout, c.LogDump)
 
 	succ = err == nil
 
-	c.SetError(err).Finished(succ)
-
-	if err != nil {
-		c.Log("[%v] %v, %vms", host, err, c.Duration().Milliseconds())
-	} else {
-		c.Log("[%v] OK, %vms", host, c.Duration().Milliseconds())
-	}
-
 	if !c.StayAlive {
-		c.Finish()
+		c.Finish(ctx)
+	} else if succ {
+		// continue to read stdout/stderr of a still running process until channel closing
+		go func() {
+			var line string
+			ok := true
+			for ok {
+				select {
+				case line, ok = <-c.cmd.Stdout:
+				case line, ok = <-c.cmd.Stderr:
+				}
+				if ok && c.LogDump && line != "" {
+					log.Printf(line)
+				}
+			}
+			// channel is closed
+			c.Finish(ctx)
+		}()
 	}
+
 	return succ
 }
 
-func (c *Probe) Finish() {
+func (c *Probe) Finisher(ctx context.Context) {
 	if c.cmd != nil {
 		err := c.cmd.Stop()
 		if err != nil {
@@ -118,28 +137,28 @@ func (c *Probe) Finish() {
 	}
 }
 
+func (c *Probe) IsAlive() bool {
+	return c.cmd == nil
+}
+
 // openvpnStart starts openvpn process and wait until connection established or error | timeout happened,
 // returns cmd.Cmd describing running openvpn instance or error
-func openvpnStart(ctx context.Context, configPath string, initTimeout time.Duration, logout bool) (runner *cmd.Cmd, err error) {
-	runner = cmd.NewCmdOptions(cmd.Options{Buffered: true, Streaming: true}, OpenvpnBinaryPath, "--config", configPath)
+func openvpnStart(ctx context.Context, configPath string, initTimeout time.Duration, logout bool) (cmdRunner *cmd.Cmd, err error) {
+	cmdRunner = cmd.NewCmdOptions(cmd.Options{Buffered: true, Streaming: true}, OpenvpnBinaryPath, "--config", configPath)
 
-	status := runner.Start()
+	status := cmdRunner.Start()
 
 	var finished cmd.Status
 	timer := time.After(initTimeout)
-	var succ bool
-	for finished.Cmd == "" && err == nil && !succ {
+	succ := false
+	for finished.Runtime == 0 && err == nil && !succ {
 		select {
 		case finished = <-status:
-			// finished (possible with error)
 			break
 		case <-timer:
 			err = ErrTimeout
-			if e := runner.Stop(); e != nil {
-				log.Printf("unexpected error on stopping openvpn process: %v", e)
-			}
-			// exit with timeout
-		case line := <-runner.Stdout:
+			break
+		case line := <-cmdRunner.Stdout:
 			if logout {
 				log.Printf(line)
 			}
@@ -147,23 +166,26 @@ func openvpnStart(ctx context.Context, configPath string, initTimeout time.Durat
 				succ = true
 				break
 			}
-			if strings.Contains(line, "Connection refused") {
+			if strings.Contains(line, "Connection refused") { // is happened only on openvpn client startup
 				err = ErrConnRefused
 				break
 			}
-		case line := <-runner.Stderr:
+		case line := <-cmdRunner.Stderr:
 			if logout {
 				log.Printf(line)
 			}
 		}
 	}
 
-	if succ || err != nil {
-		return
+	// stop process on errors
+	if err != nil {
+		if e := cmdRunner.Stop(); e != nil {
+			log.Printf("unexpected error on stopping openvpn process: %v", e)
+		}
 	}
 
-	// exit with error on startup
-	if finished.Cmd != "" {
+	// parse stdout for inapp errors if a process has stopped
+	if err == nil && finished.Runtime != 0 {
 		for _, l := range finished.Stdout {
 			if strings.Contains(l, "ERROR") || strings.Contains(l, "error") {
 				err = errors.New(l)
@@ -172,11 +194,18 @@ func openvpnStart(ctx context.Context, configPath string, initTimeout time.Durat
 		}
 		if err == nil {
 			err = fmt.Errorf("error with code %v on startup", finished.Exit)
-			// todo possible double logdump
-			if logout {
-				for _, l := range finished.Stdout {
-					log.Printf(l)
-				}
+		}
+	}
+
+	return
+}
+
+func hostFromConfigData(configData string) (host string) {
+	for _, l := range strings.Split(configData, "\n") {
+		if strings.Contains(l, "remote") {
+			args := strings.Split(l, " ")
+			if len(args) == 3 {
+				host = args[1] + ":" + args[2]
 			}
 		}
 	}

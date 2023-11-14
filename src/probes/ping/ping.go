@@ -99,6 +99,5 @@ func (c *Probe) Runner(ctx context.Context) (succ bool) {
 	}
 	wg.Wait()
 	succ = done == len(c.Hosts)
-	c.Finished(succ)
 	return
 }
