@@ -106,7 +106,7 @@ func (c *Probe) Runner(ctx context.Context) (succ bool) {
 	if !c.StayAlive {
 		c.Finish(ctx)
 	} else if succ {
-		// continue to read stdout/stderr of a still running process until channel closing
+		// continue to read stdout/stderr of running process until channel closing
 		go func() {
 			var line string
 			ok := true
@@ -138,7 +138,7 @@ func (c *Probe) Finisher(ctx context.Context) {
 }
 
 func (c *Probe) IsAlive() bool {
-	return c.cmd == nil
+	return c.cmd != nil
 }
 
 // openvpnStart starts openvpn process and wait until connection established or error | timeout happened,
