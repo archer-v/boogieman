@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func TestCmd_Runner(t *testing.T) {
+func Test_Runner(t *testing.T) {
 	ctx := context.Background()
 	defOptions := model.ProbeOptions{Timeout: time.Millisecond * 1000, Expect: true}
 
@@ -66,13 +66,13 @@ func TestCmd_Runner(t *testing.T) {
 		},
 	}
 
-	contructor := constructor{
+	constructor := constructor{
 		probeFactory.BaseConstructor{
 			Name: name,
 		},
 	}
 	for i, c := range cases {
-		p, err := contructor.NewProbe(c.options, c.config)
+		p, err := constructor.NewProbe(c.options, c.config)
 		if c.expectedError == nil && err != nil {
 			t.Errorf("Probe %v constructor returned error %v", i, err)
 			continue

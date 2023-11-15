@@ -17,7 +17,7 @@ var (
 	openvpnClientTestWrongConfigPath = "test/openvpn-client-wrong-addr.ovpn"
 )
 
-func TestPOpenvpnConnect_Runner(t *testing.T) {
+func Test_Runner(t *testing.T) {
 	ctx := context.Background()
 	options := model.ProbeOptions{Timeout: time.Millisecond * 2000, Expect: true}
 

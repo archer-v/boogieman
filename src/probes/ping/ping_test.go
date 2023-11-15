@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func TestPing_Runner(t *testing.T) {
+func Test_Runner(t *testing.T) {
 
 	ctx := context.Background()
 	options := model.ProbeOptions{Timeout: time.Millisecond * 2000, Expect: true}

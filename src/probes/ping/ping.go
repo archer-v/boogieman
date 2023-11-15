@@ -23,7 +23,7 @@ type Config struct {
 
 var name = "ping"
 
-var ErrorPingTimeout = errors.New("timeout")
+var ErrTimeout = errors.New("timeout")
 
 func init() {
 	probeFactory.RegisterProbe(constructor{probeFactory.BaseConstructor{Name: name}})
@@ -51,7 +51,7 @@ func (c *Probe) Runner(ctx context.Context) (succ bool) {
 				dur = time.Since(t)
 				if err != nil {
 					c.Log("[%v] %v, %vms", s, err, dur.Milliseconds())
-					if errors.Is(ErrorPingTimeout, err) && !c.Expect {
+					if errors.Is(ErrTimeout, err) && !c.Expect {
 						done++
 					}
 				} else {
@@ -93,7 +93,7 @@ func (c *Probe) Runner(ctx context.Context) (succ bool) {
 
 			stats := p.Statistics()
 			if stats.PacketsRecv == 0 {
-				err = ErrorPingTimeout
+				err = ErrTimeout
 			}
 		}(host)
 	}

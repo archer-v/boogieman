@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func TestWeb_Runner(t *testing.T) {
+func Test_Runner(t *testing.T) {
 
 	ctx := context.Background()
 	options := model.ProbeOptions{Timeout: time.Millisecond * 5000, Expect: true}

@@ -25,10 +25,7 @@ type Config struct {
 }
 
 var name = "cmd"
-
-var (
-	ErrTimeout = errors.New("timeout")
-)
+var ErrTimeout = errors.New("timeout")
 
 func init() {
 	probeFactory.RegisterProbe(constructor{probeFactory.BaseConstructor{Name: name}})

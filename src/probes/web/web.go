@@ -24,6 +24,7 @@ type Config struct {
 }
 
 var name = "web"
+var ErrTimeout = errors.New("timeout")
 
 func init() {
 	probeFactory.RegisterProbe(constructor{probeFactory.BaseConstructor{Name: name}})
@@ -73,7 +74,7 @@ func (c *Probe) Runner(ctx context.Context) (succ bool) {
 			r, err := client.Get(s)
 			if err != nil {
 				if strings.Contains(err.Error(), "context deadline exceeded") {
-					err = errors.New("timeout")
+					err = ErrTimeout
 				} else {
 					err = fmt.Errorf("http error %v", err)
 				}
