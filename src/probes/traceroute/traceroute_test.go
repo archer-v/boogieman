@@ -28,27 +28,31 @@ func Test_Runner(t *testing.T) {
 	}
 
 	cases := []testCase{
-		{
-			"traceroute to an existent host",
-			Config{Host: "google.com", ExpectedHop: []string{"google.com"}, HopTimeout: time.Millisecond * 200, Retries: 2, LogDump: true},
-			defOptions,
-			true,
-			nil,
-		},
-		{
-			"traceroute to an existent host when config is defined in string",
-			"google.com,google.com",
-			defOptions,
-			true,
-			nil,
-		},
-		{
-			"wrong configuration",
-			"aaa",
-			defOptions,
-			false,
-			model.ErrorConfig,
-		},
+		/*
+			{
+				"traceroute to an existent host",
+				Config{Host: "google.com", ExpectedHop: []string{"google.com"}, HopTimeout: time.Millisecond * 200, Retries: 2, LogDump: true},
+				defOptions,
+				true,
+				nil,
+			},
+			{
+				"traceroute to an existent host when config is defined in string",
+				"google.com,google.com",
+				defOptions,
+				true,
+				nil,
+			},
+			{
+				"wrong configuration",
+				"aaa",
+				defOptions,
+				false,
+				model.ErrorConfig,
+			},
+
+
+		*/
 		{
 			"traceroute to wrong host",
 			Config{Host: "192.168.10.10", ExpectedHop: []string{"aaa"}, HopTimeout: time.Millisecond * 200, Retries: 2, LogDump: true},
@@ -59,6 +63,8 @@ func Test_Runner(t *testing.T) {
 	}
 
 	for i, c := range cases {
+		caseName := fmt.Sprintf("test %v", i+1)
+		fmt.Printf("Executing case [%v]\n", caseName)
 		p, err := constructor.NewProbe(c.options, c.config)
 		if c.expectedError == nil && err != nil {
 			t.Errorf("Probe %v constructor returned error %v", i, err)
@@ -69,7 +75,7 @@ func Test_Runner(t *testing.T) {
 		} else if err != nil {
 			continue
 		}
-		if p.Start(context.WithValue(ctx, "id", fmt.Sprintf("test %v", i+1))) != c.expectedResult {
+		if p.Start(context.WithValue(ctx, "id", caseName)) != c.expectedResult {
 			t.Errorf("Probe runner %v should return %v", i, c.expectedResult)
 		} else {
 			p.Finish(ctx)

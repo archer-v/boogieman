@@ -1,18 +1,11 @@
 package traceroute
 
-// github.com/aeden/traceroute module is pretty buggy, so it should be replaced to something else
-// know bugs:
-//    - doesn't work on windows
-//    - catch someone else's icmp replies
-//    - no ivp6
-
 import (
 	"boogieman/src/model"
 	"boogieman/src/probeFactory"
 	"context"
 	"errors"
-	"fmt"
-	"github.com/aeden/traceroute"
+	"github.com/archer-v/gotraceroute"
 	"log"
 	"strings"
 	"time"
@@ -31,7 +24,7 @@ type Config struct {
 	ExpectedHop  []string
 	Retries      int `default:"2"`
 	LogDump      bool
-	traceOptions traceroute.TracerouteOptions
+	traceOptions gotraceroute.Options
 }
 
 var name = "traceroute"
@@ -54,21 +47,13 @@ func New(options model.ProbeOptions, config Config) *Probe {
 func (c *Probe) Runner(ctx context.Context) (succ bool) {
 
 	var (
-		err      error
-		tOptions traceroute.TracerouteOptions
-		hop      traceroute.TracerouteHop
+		err error
 	)
-	if c.Port > 0 {
-		tOptions.SetPort(c.Port)
-	}
-	if c.HopTimeout != 0 {
-		tOptions.SetTimeoutMs(int(c.HopTimeout.Milliseconds()))
-	}
-	if c.MaxHops > 0 {
-		tOptions.SetMaxHops(c.MaxHops)
-	}
-	if c.Retries > 0 {
-		tOptions.SetRetries(c.Retries)
+	tOptions := gotraceroute.Options{
+		Port:    c.Port,
+		Timeout: c.HopTimeout,
+		MaxHops: c.MaxHops,
+		Retries: c.Retries,
 	}
 
 	defer func() {
@@ -80,41 +65,38 @@ func (c *Probe) Runner(ctx context.Context) (succ bool) {
 		}
 	}()
 
-	tHop := make(chan traceroute.TracerouteHop, tOptions.MaxHops())
-	errChan := make(chan error)
-	go func(host string, options traceroute.TracerouteOptions, hops chan traceroute.TracerouteHop, err chan error) {
-		out, e := traceroute.Traceroute(host, &options, hops)
-		if e != nil {
-			err <- fmt.Errorf("failed: %w", e)
-		} else if len(out.Hops) == 0 {
-			err <- fmt.Errorf("failed. expected at least one hop")
-		}
-	}(c.Host, tOptions, tHop, errChan)
-
 	timer := time.After(c.Timeout)
-	ok := true
-	for ok && err == nil && !succ {
+	ctxWithCancel, cancel := context.WithCancel(ctx)
+
+	defer cancel()
+
+	hopChan, err := gotraceroute.Run(ctxWithCancel, c.Host, tOptions)
+	if err != nil {
+		return
+	}
+
+	var (
+		hop gotraceroute.Hop
+		ok  = true
+	)
+	for !succ && ok && err == nil {
 		select {
-		case hop, ok = <-tHop:
-			//parse hop
+		case <-timer:
+			err = ErrTimeout
+			break
+		case hop, ok = <-hopChan:
+			if !ok {
+				break
+			}
+			if c.LogDump {
+				log.Printf(hop.StringHuman())
+			}
 			for _, exp := range c.ExpectedHop {
-				if hop.Host != "" && strings.Contains(hop.Host, exp) {
-					succ = true
-					break
-				} else if strings.Contains(hop.AddressString(), exp) {
+				if strings.Contains(hop.Node.String(), exp) {
 					succ = true
 					break
 				}
 			}
-			if c.LogDump {
-				log.Printf("%-3d %v (%v)  %v\n", hop.TTL, hop.HostOrAddressString(), hop.AddressString(), hop.ElapsedTime)
-			}
-			break
-		case <-timer:
-			err = ErrTimeout
-			break
-		case err = <-errChan:
-
 		}
 	}
 
