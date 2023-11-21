@@ -39,6 +39,8 @@ func New(options model.ProbeOptions, config Config) *Probe {
 }
 
 func (c *Probe) Runner(ctx context.Context) (succ bool) {
+	var timings model.ProbeTimings
+	c.ProbeResult = &timings
 	var wg sync.WaitGroup
 	done := 0
 	for _, host := range c.Hosts {
@@ -55,7 +57,7 @@ func (c *Probe) Runner(ctx context.Context) (succ bool) {
 						done++
 					}
 				} else {
-					c.SetTimeStat(s, dur)
+					timings.Set(s, dur)
 					if c.Expect {
 						done++
 					}
