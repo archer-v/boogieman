@@ -107,13 +107,13 @@ func (c *Probe) Runner(ctx context.Context) (succ bool) {
 		c.Finish(ctx)
 	} else if succ {
 		// continue to read stdout/stderr of running process until channel closing
-		go func() {
+		go func(cmd *cmd.Cmd) {
 			var line string
 			ok := true
 			for ok {
 				select {
-				case line, ok = <-c.cmd.Stdout:
-				case line, ok = <-c.cmd.Stderr:
+				case line, ok = <-cmd.Stdout:
+				case line, ok = <-cmd.Stderr:
 				}
 				if ok && c.LogDump && line != "" {
 					log.Printf(line)
@@ -121,7 +121,7 @@ func (c *Probe) Runner(ctx context.Context) (succ bool) {
 			}
 			// channel is closed
 			c.Finish(ctx)
-		}()
+		}(c.cmd)
 	}
 
 	return succ
