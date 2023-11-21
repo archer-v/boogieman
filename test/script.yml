@@ -30,7 +30,7 @@ script:
           - https://google.com/
           - https://github.com/
         httpStatus: 200
-  - name: backup-gateway-off
+  - name: backup-gateway-disabled
     probe:
       name: ping
       options:
@@ -46,6 +46,7 @@ script:
       options:
         timeout: 5000
         stayAlive: true
+        debug: true
       configuration:
         configFile: src/probes/openvpnConnect/test/openvpn-client.ovpn
   - name: vpn-tunnel-alive
@@ -57,3 +58,15 @@ script:
       configuration:
         hosts:
           - 192.168.165.1
+  - name: tunnel-network-routing
+    cgroup: 3
+    probe:
+      name: traceroute
+      options:
+        timeout: 1000
+      configuration:
+        host: 192.168.165.1
+        expectedHops:
+          - 192.168.165.1
+        expectedMatch: any
+        maxHops: 5
