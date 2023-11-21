@@ -14,7 +14,7 @@ import (
 
 var envPrefix = "PROBE"
 
-type startupConfig struct {
+type startupOptions struct {
 	Daemon                bool           `envconfig:"optional"`
 	OneCheck              bool           `envconfig:"optional"`
 	CheckList             string         `envconfig:"optional"`
@@ -25,49 +25,57 @@ type startupConfig struct {
 	ProbeOptionsExpect    *bool          `envconfig:"optional"`
 }
 
-func StartupConfiguration() (script model.Script, err error) {
+type Config struct {
+	Daemon       bool
+	OutputJson   bool
+	OutputPretty bool
+	Prometheus   bool
+}
 
-	var c startupConfig
+func StartupConfiguration() (config Config, script model.Script, err error) {
+
+	var o startupOptions
 	//parse environment variables to the config struct
-	if err := envconfig.InitWithPrefix(&c, envPrefix); err != nil {
+	if err := envconfig.InitWithPrefix(&o, envPrefix); err != nil {
 		panic(err)
 	}
 
 	flaggy.DefaultParser.ShowHelpOnUnexpected = true
 
-	daemonOp := flaggy.NewSubcommand("daemon")
-	daemonOp.Description = "start in a daemon mode to perform regular checks"
+	//daemonOp := flaggy.NewSubcommand("daemon")
+	//daemonOp.Description = "start in a daemon mode to perform regular checks"
 
-	flaggy.String(&c.CheckList, "l", "checklist", "path to a checklist file in yml format")
-	flaggy.String(&c.ProbeName, "n", "probename", "a probeFactory name (ignored if checklist option is selected)")
-	flaggy.String(&c.ProbeConf, "c", "probeconf", "probeFactory config data (ignored if checklist option is selected)")
-	flaggy.Duration(c.ProbeOptionsTimeout, "t", "timeout", "operation waiting timeout (ignored if checklist option is selected)")
-	flaggy.Bool(c.ProbeOptionsExpect, "e", "expect", "expected result true|false (ignored if checklist option is selected)")
-	//flaggy.Bool(&c.ProbeOptionsStayAlive, "a", "stayalive", "leave the probe related flow to stay running after main probe condition is finish (applicable only for some probes)")
+	flaggy.String(&o.CheckList, "l", "checklist", "path to a checklist file in yml format")
+	flaggy.String(&o.ProbeName, "n", "probename", "a probeFactory name (ignored if checklist option is selected)")
+	flaggy.String(&o.ProbeConf, "o", "probeconf", "probeFactory config data (ignored if checklist option is selected)")
+	flaggy.Duration(o.ProbeOptionsTimeout, "t", "timeout", "operation waiting timeout (ignored if checklist option is selected)")
+	flaggy.Bool(o.ProbeOptionsExpect, "e", "expect", "expected result true|false (ignored if checklist option is selected)")
+	flaggy.Bool(&config.OutputJson, "j", "json", "output result in JSON format")
+	flaggy.Bool(&config.OutputPretty, "J", "pretty", "pretty output with indent and CR")
 
-	flaggy.AttachSubcommand(daemonOp, 1)
+	//flaggy.AttachSubcommand(daemonOp, 1)
 
 	flaggy.Parse()
 
-	if (c.CheckList == "" && c.ProbeName == "") || (c.CheckList != "" && c.ProbeName != "") {
+	if (o.CheckList == "" && o.ProbeName == "") || (o.CheckList != "" && o.ProbeName != "") {
 		err = errors.New("either 'checklist' or 'probename' option should be defined")
 		flaggy.ShowHelp(err.Error())
 		return
 	}
 
-	if c.ProbeName != "" {
+	if o.ProbeName != "" {
 		var p model.Prober
-		o := model.DefaultProbeOptions
-		if c.ProbeOptionsExpect != nil {
-			o.Expect = *c.ProbeOptionsExpect
+		d := model.DefaultProbeOptions
+		if o.ProbeOptionsExpect != nil {
+			d.Expect = *o.ProbeOptionsExpect
 		}
-		if c.ProbeOptionsTimeout != nil {
-			o.Timeout = *c.ProbeOptionsTimeout
+		if o.ProbeOptionsTimeout != nil {
+			d.Timeout = *o.ProbeOptionsTimeout
 		}
-		if c.ProbeOptionsStayAlive != nil {
-			o.StayAlive = *c.ProbeOptionsStayAlive
+		if o.ProbeOptionsStayAlive != nil {
+			d.StayAlive = *o.ProbeOptionsStayAlive
 		}
-		p, err = probeFactory.NewProbe(c.ProbeName, o, c.ProbeConf)
+		p, err = probeFactory.NewProbe(o.ProbeName, d, o.ProbeConf)
 		if err != nil {
 			return
 		}
@@ -78,9 +86,9 @@ func StartupConfiguration() (script model.Script, err error) {
 		})
 	}
 
-	if c.CheckList != "" {
+	if o.CheckList != "" {
 		var data []byte
-		data, err = os.ReadFile(c.CheckList)
+		data, err = os.ReadFile(o.CheckList)
 		if err != nil {
 			return
 		}
@@ -91,7 +99,7 @@ func StartupConfiguration() (script model.Script, err error) {
 		}
 	}
 
-	script.Daemon = c.Daemon
+	config.Daemon = o.Daemon
 
 	return
 }

@@ -4,6 +4,7 @@ import (
 	"boogieman/src/configuration"
 	"boogieman/src/runner"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 )
@@ -24,7 +25,7 @@ func main() {
 		version = fmt.Sprintf("version: %v-%v-%v, build: %v", gitTag, gitBranch, gitCommit, buildTimestamp)
 	}
 
-	script, err := configuration.StartupConfiguration()
+	config, script, err := configuration.StartupConfiguration()
 	if err != nil {
 		fmt.Printf(err.Error())
 		os.Exit(ExitErrConfig)
@@ -36,10 +37,19 @@ func main() {
 
 	runner.Run(ctx)
 
+	if config.OutputJson {
+		var d []byte
+		if config.OutputPretty {
+			d, _ = json.MarshalIndent(script, "", "    ")
+		} else {
+			d, _ = json.Marshal(script)
+		}
+		fmt.Println(string(d))
+	}
+
 	if runner.Result.Success {
 		os.Exit(0)
 	} else {
 		os.Exit(ExitFailed)
 	}
-
 }
