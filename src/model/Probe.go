@@ -21,8 +21,9 @@ var DefaultProbeOptions ProbeOptions
 
 type ProbeOptions struct {
 	Timeout   time.Duration `json:"timeout,omitempty" default:"5000ms"`
-	StayAlive bool          `json:"stayAlive,omitempty"` // probe process stays live after runner is exit, and should be finished by calling Finish method
+	StayAlive bool          `json:"stayAlive,omitempty"` // probe process should stay alive after check is finished
 	Expect    bool          `json:"expect,omitempty" default:"true"`
+	Debug     bool          `json:"debug,omitempty" default:"false"`
 }
 
 func (s *ProbeOptions) UnmarshalJSON(b []byte) (err error) {
@@ -42,24 +43,43 @@ func (s *ProbeOptions) UnmarshalJSON(b []byte) (err error) {
 	return
 }
 
+type ProbeTimings struct {
+	Timings map[string]time.Duration
+	sync.Mutex
+}
+
+func (c *ProbeTimings) Set(name string, dur time.Duration) {
+	c.Lock()
+	if c.Timings == nil {
+		c.Timings = make(map[string]time.Duration)
+	}
+	c.Timings[name] = dur
+	c.Unlock()
+}
+
+// ProbeRunner is the probe runner that performs check
 type ProbeRunner func(ctx context.Context) (succ bool)
+
+// ProbeFinisher is the finish method for long-lived probe,
+// is called cleanup code at the script end
 type ProbeFinisher func(ctx context.Context)
 
 type ProbeHandler struct {
-	ProbeOptions
+	ProbeOptions `json:"-"`
 	Runner
 	Result
-	Name              string // probe name
-	CanStayBackground bool
+	ProbeResult       any
+	Name              string                   // probe name
+	CanStayBackground bool                     `json:"-"` // flag that means the probing process can stay in background
 	runner            ProbeRunner              // probe runner
 	finisher          ProbeFinisher            // probe finisher, only for probe that stays alive in background
 	timings           map[string]time.Duration // timings data
 	logContext        string                   // log prefix string
 	error             error                    // last startup error
-	sync.Mutex
+	//	sync.Mutex
 }
 
-// Start starts the probing and returns a probing result
+// Start starts the probing and returns a probing result, don't call directly
 func (c *ProbeHandler) Start(ctx context.Context) (succ bool) {
 	if c.runner == nil {
 		c.Log("runner isn't defined")
@@ -69,16 +89,22 @@ func (c *ProbeHandler) Start(ctx context.Context) (succ bool) {
 		c.Log("wrong runner status: %v", err.Error())
 	}
 	c.Result.PrepareToStart()
-	if ctx != nil && ctx.Value("id") != nil {
-		c.SetLogContext(ctx.Value("id").(string))
-	}
-	succ = c.runner(ctx)
 
+	var ctxID string
+	if ctx != nil && ctx.Value("id") != nil {
+		ctxID = ctx.Value("id").(string)
+	}
+	c.SetLogContext(ctxID)
+	c.logDebug("Starting the probe runner")
+	succ = c.runner(ctx)
+	c.logDebug("The probe runner has been finished with success status: %v", succ)
 	c.Result.End(succ)
 
 	// todo do not clear && messy, need refactor
 	if !c.CanStayBackground || !succ || c.Error() != nil || !c.StayAlive {
 		_ = c.EStatusFinish(succ)
+	} else {
+		c.logDebug("The probe process stays alive")
 	}
 
 	if succ {
@@ -86,9 +112,18 @@ func (c *ProbeHandler) Start(ctx context.Context) (succ bool) {
 	} else {
 		c.Log("FAIL")
 	}
-	c.SetLogContext("")
+	//	c.SetLogContext("")
 
 	return
+}
+
+// Finish finishes a long-lived background probe process, don't call directly
+func (c *ProbeHandler) Finish(ctx context.Context) {
+	if c.finisher != nil {
+		c.logDebug("Finishing a background probe process")
+		c.finisher(ctx)
+	}
+	_ = c.EStatusFinish(true)
 }
 
 // SetError sets probing error, should be called internally from the probe
@@ -109,24 +144,6 @@ func (c *ProbeHandler) SetFinisher(f ProbeFinisher) *ProbeHandler {
 	return c
 }
 
-// SetTimeStat saves probing statistics, should be called internally from the probe
-func (c *ProbeHandler) SetTimeStat(name string, dur time.Duration) {
-	c.Lock()
-	if c.timings == nil {
-		c.timings = make(map[string]time.Duration)
-	}
-	c.timings[name] = dur
-	c.Unlock()
-}
-
-// TimeStat returns probing stat data
-func (c *ProbeHandler) TimeStat() map[string]time.Duration {
-	if c.timings == nil {
-		return make(map[string]time.Duration)
-	}
-	return c.timings
-}
-
 // Log logouts the message, should be called internally from the probe
 func (c *ProbeHandler) Log(format string, args ...any) {
 	if c.logContext == "" {
@@ -139,6 +156,13 @@ func (c *ProbeHandler) Log(format string, args ...any) {
 	log.Printf(c.logContext+delim+format+"\n", args...)
 }
 
+func (c *ProbeHandler) logDebug(format string, args ...any) {
+	if !c.Debug {
+		return
+	}
+	c.Log("[debug] "+format, args...)
+}
+
 // SetLogContext sets log context, should be called internally from the probe
 func (c *ProbeHandler) SetLogContext(ctx string) {
 	if ctx != "" {
@@ -146,14 +170,6 @@ func (c *ProbeHandler) SetLogContext(ctx string) {
 	} else {
 		c.logContext = "[" + c.Name + "]"
 	}
-}
-
-// Finish is just a stub for probe that should fit the Prober interface but doesn't have a Finish method itself
-func (c *ProbeHandler) Finish(ctx context.Context) {
-	if c.finisher != nil {
-		c.finisher(ctx)
-	}
-	_ = c.EStatusFinish(true)
 }
 
 func (c *ProbeHandler) Error() error {
@@ -169,5 +185,4 @@ type Prober interface {
 	Finish(ctx context.Context)
 	Error() error
 	IsAlive() bool
-	TimeStat() map[string]time.Duration
 }
