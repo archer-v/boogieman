@@ -17,14 +17,15 @@ type Probe struct {
 }
 
 type Config struct {
-	Host         string
-	Port         int
-	MaxHops      int
-	HopTimeout   time.Duration `default:"200ms"`
-	ExpectedHop  []string
-	Retries      int `default:"2"`
-	LogDump      bool
-	traceOptions gotraceroute.Options
+	Host          string
+	Port          int
+	MaxHops       int
+	HopTimeout    time.Duration `default:"200ms"`
+	ExpectedHops  []string
+	ExpectedMatch string `default:"any"` // any | all | none
+	Retries       int    `default:"2"`
+	LogDump       bool
+	traceOptions  gotraceroute.Options
 }
 
 var name = "traceroute"
@@ -76,24 +77,41 @@ func (c *Probe) Runner(ctx context.Context) (succ bool) {
 	}
 
 	var (
-		hop gotraceroute.Hop
-		ok  = true
+		hop             gotraceroute.Hop
+		traceInProgress = true
+		finished        = false
+		matches         = 0
 	)
-	for !succ && ok && err == nil {
+	if c.ExpectedMatch == "none" {
+		succ = true
+	}
+	for !finished && traceInProgress && err == nil {
 		select {
 		case <-timer:
 			err = ErrTimeout
 			break
-		case hop, ok = <-hopChan:
-			if !ok {
+		case hop, traceInProgress = <-hopChan:
+			if !traceInProgress {
 				break
 			}
 			if c.LogDump {
 				log.Printf(hop.StringHuman())
 			}
-			for _, exp := range c.ExpectedHop {
+			for _, exp := range c.ExpectedHops {
 				if strings.Contains(hop.Node.String(), exp) {
-					succ = true
+					if c.ExpectedMatch == "any" {
+						succ = true
+						finished = true
+					} else if c.ExpectedMatch == "none" {
+						succ = false
+						finished = true
+					} else if c.ExpectedMatch == "all" {
+						matches++
+						if matches == len(c.ExpectedHops) {
+							succ = true
+							finished = true
+						}
+					}
 					break
 				}
 			}

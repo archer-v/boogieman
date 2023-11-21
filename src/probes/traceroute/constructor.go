@@ -20,7 +20,7 @@ func (c constructor) NewProbe(options model.ProbeOptions, configuration any) (p 
 	if config.Host == "" {
 		return nil, model.ErrorConfig
 	}
-	if len(config.ExpectedHop) == 0 || config.ExpectedHop[0] == "" {
+	if len(config.ExpectedHops) == 0 || config.ExpectedHops[0] == "" {
 		return nil, model.ErrorConfig
 	}
 
@@ -51,15 +51,10 @@ func (c constructor) configuration(conf any) (config Config, err error) {
 		}
 		config = *(c.NewProbeConfiguration().(*Config))
 		config.Host = s[0]
-		config.ExpectedHop = s[1:]
+		config.ExpectedHops = s[1:]
 	} else {
 		err = model.ErrorConfig
 		return
 	}
-	/*
-		for _, r := range config.ExpectedHop {
-			//s := regexp.MustCompile("\\s*,\\s*").Split(str, -1)
-		}
-	*/
 	return
 }

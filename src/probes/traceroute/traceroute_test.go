@@ -31,7 +31,7 @@ func Test_Runner(t *testing.T) {
 		/*
 			{
 				"traceroute to an existent host",
-				Config{Host: "google.com", ExpectedHop: []string{"google.com"}, HopTimeout: time.Millisecond * 200, Retries: 2, LogDump: true},
+				Config{Host: "google.com", ExpectedHops: []string{"google.com"}, HopTimeout: time.Millisecond * 200, Retries: 2, LogDump: true},
 				defOptions,
 				true,
 				nil,
@@ -55,7 +55,7 @@ func Test_Runner(t *testing.T) {
 		*/
 		{
 			"traceroute to wrong host",
-			Config{Host: "192.168.10.10", ExpectedHop: []string{"aaa"}, HopTimeout: time.Millisecond * 200, Retries: 2, LogDump: true},
+			Config{Host: "192.168.10.10", ExpectedHops: []string{"aaa"}, HopTimeout: time.Millisecond * 200, Retries: 2, LogDump: true},
 			defOptions,
 			false,
 			nil,
