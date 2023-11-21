@@ -41,7 +41,6 @@ func ymlConfiguration(data []byte) (s model.Script, err error) {
 		return
 	}
 
-	s.Daemon = parsed.Daemon
 	//s.Tasks = make([]*model.Task, len(parsed.Script))
 	var p model.Prober
 	for _, v := range parsed.Script {

@@ -20,17 +20,16 @@ func init() {
 }
 
 type Script struct {
-	Daemon  bool
-	Timeout time.Duration
+	Timeout time.Duration `json:"-"`
 	Tasks   []*Task
-	CGroups []*CGroup
+	CGroups []*CGroup `json:"-"`
 	Runner
 	anonymousCGroup *CGroup
 }
 
 type Task struct {
 	Name   string
-	CGroup string
+	CGroup string `json:"-"`
 	Probe  Prober
 	Runner
 	//DependsOn      *Task
