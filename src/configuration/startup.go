@@ -15,91 +15,115 @@ import (
 var envPrefix = "PROBE"
 
 type startupOptions struct {
-	Daemon                bool           `envconfig:"optional"`
-	OneCheck              bool           `envconfig:"optional"`
-	CheckList             string         `envconfig:"optional"`
-	ProbeName             string         `envconfig:"optional"`
-	ProbeConf             string         `envconfig:"optional"`
-	ProbeOptionsTimeout   *time.Duration `envconfig:"optional"`
-	ProbeOptionsStayAlive *bool          `envconfig:"optional"`
-	ProbeOptionsExpect    *bool          `envconfig:"optional"`
+	Script              string         `envconfig:"optional"`
+	ProbeName           string         `envconfig:"optional"`
+	ProbeConf           string         `envconfig:"optional"`
+	ProbeOptionsTimeout *time.Duration `envconfig:"optional"`
+	ProbeOptionsExpect  *bool          `envconfig:"optional"`
+	Config              string         `envconfig:"optional"`
 }
 
-type Config struct {
-	Daemon       bool
+type StartupConfig struct {
+	OneRun       bool
 	OutputJson   bool
 	OutputPretty bool
-	Prometheus   bool
+	HttpPort     int
+	Script       *model.Script
+	ScheduleJobs []ScheduleJob
 }
 
-func StartupConfiguration() (config Config, script model.Script, err error) {
+func StartupConfiguration() (config StartupConfig, err error) {
 
 	var o startupOptions
-	//parse environment variables to the config struct
+	//parse environment variables to the daemonConfig struct
 	if err := envconfig.InitWithPrefix(&o, envPrefix); err != nil {
 		panic(err)
 	}
 
 	flaggy.DefaultParser.ShowHelpOnUnexpected = true
 
-	//daemonOp := flaggy.NewSubcommand("daemon")
-	//daemonOp.Description = "start in a daemon mode to perform regular checks"
+	oneRun := flaggy.NewSubcommand("oneRun")
+	oneRun.Description = "performs a single run, print result and exit"
 
-	flaggy.String(&o.CheckList, "l", "checklist", "path to a checklist file in yml format")
-	flaggy.String(&o.ProbeName, "n", "probename", "a probeFactory name (ignored if checklist option is selected)")
-	flaggy.String(&o.ProbeConf, "o", "probeconf", "probeFactory config data (ignored if checklist option is selected)")
-	flaggy.Duration(o.ProbeOptionsTimeout, "t", "timeout", "operation waiting timeout (ignored if checklist option is selected)")
-	flaggy.Bool(o.ProbeOptionsExpect, "e", "expect", "expected result true|false (ignored if checklist option is selected)")
-	flaggy.Bool(&config.OutputJson, "j", "json", "output result in JSON format")
-	flaggy.Bool(&config.OutputPretty, "J", "pretty", "pretty output with indent and CR")
+	oneRun.String(&o.Script, "s", "script", "path to a checklist file in yml format")
+	oneRun.String(&o.ProbeName, "n", "probename", "a probeFactory name (ignored if script option is selected)")
+	oneRun.String(&o.ProbeConf, "o", "probeconf", "probeFactory daemonConfig data (ignored if script option is selected)")
+	oneRun.Duration(o.ProbeOptionsTimeout, "t", "timeout", "operation waiting timeout (ignored if script option is selected)")
+	oneRun.Bool(o.ProbeOptionsExpect, "e", "expect", "expected result true|false (ignored if script option is selected)")
+	oneRun.Bool(&config.OutputJson, "j", "json", "output result in JSON format")
+	oneRun.Bool(&config.OutputPretty, "J", "pretty", "pretty output with indent and CR")
 
-	//flaggy.AttachSubcommand(daemonOp, 1)
+	daemon := flaggy.NewSubcommand("daemon")
+	daemon.Description = "start in daemon mode and performs scheduled jobs"
+	daemon.String(&o.Config, "c", "config", "path to a configuration file in yml format")
+
+	flaggy.AttachSubcommand(oneRun, 1)
+	flaggy.AttachSubcommand(daemon, 1)
 
 	flaggy.Parse()
 
-	if (o.CheckList == "" && o.ProbeName == "") || (o.CheckList != "" && o.ProbeName != "") {
-		err = errors.New("either 'checklist' or 'probename' option should be defined")
-		flaggy.ShowHelp(err.Error())
+	if oneRun.Used {
+		config.OneRun = true
+		if (o.Script == "" && o.ProbeName == "") || (o.Script != "" && o.ProbeName != "") {
+			err = errors.New("either 'script' or 'probename' option should be defined")
+			flaggy.ShowHelp(err.Error())
+			return
+		}
+
+		if o.ProbeName != "" {
+			var p model.Prober
+			d := model.DefaultProbeOptions
+			if o.ProbeOptionsExpect != nil {
+				d.Expect = *o.ProbeOptionsExpect
+			}
+			if o.ProbeOptionsTimeout != nil {
+				d.Timeout = *o.ProbeOptionsTimeout
+			}
+			p, err = probeFactory.NewProbe(o.ProbeName, d, o.ProbeConf)
+			if err != nil {
+				return
+			}
+
+			config.Script = &model.Script{}
+			config.Script.AddTask(&model.Task{
+				Probe: p,
+			})
+		}
+
+		if o.Script != "" {
+			var data []byte
+			data, err = os.ReadFile(o.Script)
+			if err != nil {
+				return
+			}
+			config.Script, err = ScriptYMLConfiguration(data)
+			if err != nil {
+				err = fmt.Errorf("can't parse configuration from file: %v", err)
+				return
+			}
+		}
 		return
 	}
 
-	if o.ProbeName != "" {
-		var p model.Prober
-		d := model.DefaultProbeOptions
-		if o.ProbeOptionsExpect != nil {
-			d.Expect = *o.ProbeOptionsExpect
-		}
-		if o.ProbeOptionsTimeout != nil {
-			d.Timeout = *o.ProbeOptionsTimeout
-		}
-		if o.ProbeOptionsStayAlive != nil {
-			d.StayAlive = *o.ProbeOptionsStayAlive
-		}
-		p, err = probeFactory.NewProbe(o.ProbeName, d, o.ProbeConf)
-		if err != nil {
+	if daemon.Used {
+		if o.Config == "" {
+			err = errors.New("configuration file should be defined in a daemon mode")
+			flaggy.ShowHelp(err.Error())
 			return
 		}
-
-		script = model.NewScript()
-		script.AddTask(&model.Task{
-			Probe: p,
-		})
-	}
-
-	if o.CheckList != "" {
 		var data []byte
-		data, err = os.ReadFile(o.CheckList)
+		data, err = os.ReadFile(o.Config)
 		if err != nil {
 			return
 		}
-		script, err = ymlConfiguration(data)
-		if err != nil {
-			err = fmt.Errorf("can't parse configuration from file: %v", err)
+
+		daemonConfig, e := DaemonYMLConfiguration(data)
+		if e != nil {
+			err = fmt.Errorf("can't parse configuration from file: %v", e)
 			return
 		}
+		config.HttpPort = daemonConfig.General.HttpPort
+		config.ScheduleJobs = daemonConfig.Jobs
 	}
-
-	config.Daemon = o.Daemon
-
 	return
 }

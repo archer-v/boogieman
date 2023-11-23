@@ -7,23 +7,21 @@ import (
 	"fmt"
 	"github.com/creasty/defaults"
 	"sigs.k8s.io/yaml" // uses it instead gopkg.in/yaml.v3 as it also supports json attributes in struct
-	"time"
 )
 
-type Script struct {
-	Daemon  bool
-	Timeout time.Duration `default:"60s"`
-	Script  []Record
+type script struct {
+	//Timeout time.Duration `default:"60s"`
+	Script []record
 }
 
-type Record struct {
+type record struct {
 	Name   string
-	Probe  Probe
+	Probe  probe
 	CGroup string
 	//DependsOn      string
 }
 
-type Probe struct {
+type probe struct {
 	Name             string
 	RawConfiguration *json.RawMessage `json:"configuration"`
 	Configuration    any              `json:"-"`
@@ -31,9 +29,9 @@ type Probe struct {
 	Expect           bool
 }
 
-func ymlConfiguration(data []byte) (s model.Script, err error) {
-	s = model.NewScript()
-	parsed := Script{}
+func ScriptYMLConfiguration(data []byte) (s *model.Script, err error) {
+	s = &model.Script{}
+	parsed := script{}
 	if err = defaults.Set(&parsed); err != nil {
 		return
 	}
@@ -41,7 +39,7 @@ func ymlConfiguration(data []byte) (s model.Script, err error) {
 		return
 	}
 
-	//s.Tasks = make([]*model.Task, len(parsed.Script))
+	//s.Tasks = make([]*model.Task, len(parsed.script))
 	var p model.Prober
 	for _, v := range parsed.Script {
 		var config any
@@ -51,10 +49,10 @@ func ymlConfiguration(data []byte) (s model.Script, err error) {
 			err = fmt.Errorf("[%v] %w", v.Name, err)
 			return
 		}
-		// try to fill config from RawConfiguration data
+		// try to fill daemonConfig from RawConfiguration data
 		if v.Probe.RawConfiguration != nil {
 			e := json.Unmarshal(*v.Probe.RawConfiguration, config)
-			// if unmarshal error, set config to raw data in order the Probe try to parse config by itself
+			// if unmarshal error, set daemonConfig to raw data in order the probe try to parse daemonConfig by itself
 			if e != nil {
 				config = []byte(*v.Probe.RawConfiguration)
 			}

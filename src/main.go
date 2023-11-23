@@ -6,7 +6,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/go-co-op/gocron"
+	"log"
 	"os"
+	"time"
 )
 
 const (
@@ -25,7 +28,7 @@ func main() {
 		version = fmt.Sprintf("version: %v-%v-%v, build: %v", gitTag, gitBranch, gitCommit, buildTimestamp)
 	}
 
-	config, script, err := configuration.StartupConfiguration()
+	config, err := configuration.StartupConfiguration()
 	if err != nil {
 		fmt.Printf(err.Error())
 		os.Exit(ExitErrConfig)
@@ -33,23 +36,40 @@ func main() {
 
 	ctx := context.Background()
 
-	runner := runner.NewRunner(script)
-
-	runner.Run(ctx)
-
-	if config.OutputJson {
-		var d []byte
-		if config.OutputPretty {
-			d, _ = json.MarshalIndent(script, "", "    ")
-		} else {
-			d, _ = json.Marshal(script)
+	// start in oneRun working mode
+	if config.Script != nil {
+		runner := runner.NewRunner(config.Script)
+		runner.Run(ctx)
+		if config.OutputJson {
+			var d []byte
+			if config.OutputPretty {
+				d, _ = json.MarshalIndent(config.Script, "", "    ")
+			} else {
+				d, _ = json.Marshal(config.Script)
+			}
+			fmt.Println(string(d))
 		}
-		fmt.Println(string(d))
+
+		if runner.Result.Success {
+			os.Exit(0)
+		} else {
+			os.Exit(ExitFailed)
+		}
 	}
 
-	if runner.Result.Success {
-		os.Exit(0)
-	} else {
-		os.Exit(ExitFailed)
+	// daemon mode
+	scheduler := gocron.NewScheduler(time.Local)
+	scheduler.TagsUnique()
+	scheduler.SingletonModeAll()
+
+	for i, j := range config.ScheduleJobs {
+		r := runner.NewRunner(j.Script)
+		config.ScheduleJobs[i].CronJob, err = scheduler.Every(j.Schedule).Name(j.Name).DoWithJobDetails(func(r runner.Runner, job *gocron.Job) {
+			log.Printf("[%v] starting the job\n", job.GetName())
+			r.Run(job.Context())
+			log.Printf("[%v] job has been finished\n", job.GetName())
+		}, r)
 	}
+
+	os.Exit(0)
 }

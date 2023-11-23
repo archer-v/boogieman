@@ -20,10 +20,10 @@ var ErrorConfig = errors.New("wrong configuration")
 var DefaultProbeOptions ProbeOptions
 
 type ProbeOptions struct {
-	Timeout   time.Duration `json:"timeout,omitempty" default:"5000ms"`
-	StayAlive bool          `json:"stayAlive,omitempty"` // probe process should stay alive after check is finished
-	Expect    bool          `json:"expect,omitempty" default:"true"`
-	Debug     bool          `json:"debug,omitempty" default:"false"`
+	Timeout        time.Duration `json:"timeout,omitempty" default:"5000ms"`
+	StayBackground bool          `json:"stayBackground,omitempty"` // a probe runner should stay alive after check is finished
+	Expect         bool          `json:"expect,omitempty" default:"true"`
+	Debug          bool          `json:"debug,omitempty" default:"false"`
 }
 
 func (s *ProbeOptions) UnmarshalJSON(b []byte) (err error) {
@@ -65,7 +65,7 @@ type ProbeRunner func(ctx context.Context) (succ bool)
 type ProbeFinisher func(ctx context.Context)
 
 type ProbeHandler struct {
-	ProbeOptions `json:"-"`
+	ProbeOptions `json:"options"`
 	Runner
 	Result
 	ProbeResult       any
@@ -101,7 +101,7 @@ func (c *ProbeHandler) Start(ctx context.Context) (succ bool) {
 	c.Result.End(succ)
 
 	// todo do not clear && messy, need refactor
-	if !c.CanStayBackground || !succ || c.Error() != nil || !c.StayAlive {
+	if !c.CanStayBackground || !succ || c.Error() != nil || !c.StayBackground {
 		_ = c.EStatusFinish(succ)
 	} else {
 		c.logDebug("The probe process stays alive")

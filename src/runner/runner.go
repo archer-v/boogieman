@@ -10,7 +10,7 @@ import (
 )
 
 type Runner struct {
-	script            model.Script
+	script            *model.Script
 	Result            ScriptResult
 	Progress          Progress
 	probesStayedAlive *goconcurrentqueue.FIFO
@@ -37,7 +37,7 @@ type Progress struct {
 	CheckStartedAt  time.Time
 }
 
-func NewRunner(script model.Script) Runner {
+func NewRunner(script *model.Script) Runner {
 	return Runner{
 		script:            script,
 		probesStayedAlive: goconcurrentqueue.NewFIFO(),

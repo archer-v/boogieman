@@ -120,12 +120,3 @@ func NewTask(taskName string, cgroup string, probe Prober) (t *Task) {
 	}
 	return
 }
-
-func NewScript() (s Script) {
-	s = Script{
-		Runner: Runner{
-			EStatus: EStatusNew,
-		},
-	}
-	return
-}
