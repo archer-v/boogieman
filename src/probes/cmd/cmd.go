@@ -13,8 +13,8 @@ import (
 
 type Probe struct {
 	model.ProbeHandler
-	Config
-	cmd *cmd.Cmd
+	Config `json:"config"`
+	cmd    *cmd.Cmd
 }
 
 type Config struct {
@@ -85,7 +85,7 @@ func (c *Probe) Runner(ctx context.Context) (succ bool) {
 		}
 	}
 
-	if c.StayAlive {
+	if c.StayBackground {
 		// process waiting timeout is happened, process is still alive
 		if timeout != nil {
 			succ = true

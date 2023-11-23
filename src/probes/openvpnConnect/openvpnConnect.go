@@ -19,8 +19,8 @@ var OpenvpnBinaryPath = "openvpn"
 
 type Probe struct {
 	model.ProbeHandler
-	Config
-	cmd *cmd.Cmd
+	Config `json:"config"`
+	cmd    *cmd.Cmd
 }
 
 type Config struct {
@@ -103,7 +103,7 @@ func (c *Probe) Runner(ctx context.Context) (succ bool) {
 
 	succ = err == nil
 
-	if !c.StayAlive {
+	if !c.StayBackground {
 		c.Finish(ctx)
 	} else if succ {
 		// continue to read stdout/stderr of running process until channel closing

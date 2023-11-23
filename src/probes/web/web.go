@@ -15,11 +15,11 @@ import (
 
 type Probe struct {
 	model.ProbeHandler
-	Config
+	Config `json:"config"`
 }
 
 type Config struct {
-	HttpStatus int `default:"200""`
+	HttpStatus int `default:"200"`
 	Urls       []string
 }
 

@@ -14,7 +14,7 @@ import (
 
 type Probe struct {
 	model.ProbeHandler
-	Config
+	Config `json:"config"`
 }
 
 type Config struct {

@@ -53,14 +53,14 @@ func Test_Runner(t *testing.T) {
 		{
 			"command is started and stays alive and probe returns true",
 			Config{Cmd: "test/cmd_sleep.sh", Args: []string{"3", "0"}},
-			model.ProbeOptions{Timeout: time.Millisecond * 200, Expect: true, StayAlive: true},
+			model.ProbeOptions{Timeout: time.Millisecond * 200, Expect: true, StayBackground: true},
 			true,
 			nil,
 		},
 		{
 			"command is started and have to stays alive but finished and probe returns false",
 			Config{Cmd: "test/cmd_sleep.sh", Args: []string{"0.5", "0"}},
-			model.ProbeOptions{Timeout: time.Millisecond * 1000, Expect: true, StayAlive: true},
+			model.ProbeOptions{Timeout: time.Millisecond * 1000, Expect: true, StayBackground: true},
 			false,
 			nil,
 		},
