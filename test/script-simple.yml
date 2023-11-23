@@ -1,0 +1,32 @@
+script:
+  - name: gateway-alive
+    cgroup: 1
+    probe:
+      name: ping
+      options:
+        timeout: 100
+      configuration:
+        # localhost just for an example
+        hosts:
+          - 127.0.0.1
+          - 127.0.0.2
+  - name: internet-alive
+    cgroup: 1
+    probe:
+      name: web
+      options:
+        timeout: 1500
+      configuration:
+        urls:
+          - https://google.com/
+          - https://github.com/
+        httpStatus: 200
+  - name: backup-gateway-disabled
+    probe:
+      name: ping
+      options:
+        expect: false
+        timeout: 200
+      configuration:
+        hosts:
+          - 192.168.105.105
