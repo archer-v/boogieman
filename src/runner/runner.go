@@ -11,23 +11,8 @@ import (
 
 type Runner struct {
 	script            *model.Script
-	Result            ScriptResult
 	Progress          Progress
 	probesStayedAlive *goconcurrentqueue.FIFO
-}
-
-type ScriptResult struct {
-	StartedAt time.Time
-	Duration  time.Duration
-	Checks    []CheckResult
-	Success   bool
-}
-
-type CheckResult struct {
-	Name     string
-	Success  bool
-	Duration time.Duration
-	Timings  map[string]time.Duration
 }
 
 type Progress struct {
@@ -44,6 +29,7 @@ func NewRunner(script *model.Script) Runner {
 	}
 }
 
+// Run starts the script and blocks until finish
 func (r *Runner) Run(ctx context.Context) {
 	if err := r.script.EStatusRun(); err != nil {
 		r.Log(err.Error())
@@ -54,13 +40,16 @@ func (r *Runner) Run(ctx context.Context) {
 		r.runCgroup(ctx, cGroup)
 	}
 
+	// finished
 	succ := true
 	for _, t := range r.script.Tasks {
-		succ = succ && t.Success
+		taskResult, _ := t.Result()
+		succ = succ && taskResult.Success
 	}
 
 	_ = r.script.EStatusFinish(succ)
 
+	// finishing background probes stayed alive
 	for i, e := r.probesStayedAlive.Dequeue(); e == nil; i, e = r.probesStayedAlive.Dequeue() {
 		probe, ok := i.(model.Prober)
 		if !ok {
@@ -69,6 +58,10 @@ func (r *Runner) Run(ctx context.Context) {
 		}
 		probe.Finish(ctx)
 	}
+}
+
+func (r *Runner) Result() model.ScriptResult {
+	return r.script.Result()
 }
 
 func (r *Runner) runCgroup(ctx context.Context, cgroup *model.CGroup) (succ bool) {
@@ -100,8 +93,10 @@ func (r *Runner) runCgroup(ctx context.Context, cgroup *model.CGroup) (succ bool
 	wg.Wait()
 	succ = true
 	for _, t := range r.script.Tasks {
-		succ = succ && t.Success
+		taskResult, _ := t.Result()
+		succ = succ && taskResult.Success
 	}
+	_ = cgroup.EStatusFinish(succ)
 	return
 }
 

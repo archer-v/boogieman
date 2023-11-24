@@ -45,7 +45,7 @@ func New(options model.ProbeOptions, config Config) *Probe {
 	return &p
 }
 
-func (c *Probe) Runner(ctx context.Context) (succ bool) {
+func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 
 	var (
 		err error

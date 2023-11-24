@@ -39,15 +39,14 @@ func New(options model.ProbeOptions, config Config) *Probe {
 	return &p
 }
 
-func (c *Probe) Runner(ctx context.Context) (succ bool) {
-	var timings model.ProbeTimings
-	c.ProbeResult = &timings
+func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
+	var timings model.Timings
 	var wg sync.WaitGroup
 	done := 0
 	for _, s := range c.Urls {
 		if _, e := url.Parse(s); e != nil {
 			c.Log("wrong url %v", s)
-			return false
+			return false, nil
 		}
 
 		wg.Add(1)
@@ -90,5 +89,6 @@ func (c *Probe) Runner(ctx context.Context) (succ bool) {
 	}
 	wg.Wait()
 	succ = done == len(c.Urls)
+	resultObject = &timings
 	return
 }

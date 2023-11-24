@@ -1,7 +1,6 @@
 package model
 
 import (
-	"context"
 	"github.com/starshiptroopers/uidgenerator"
 	"time"
 )
@@ -23,57 +22,19 @@ type Script struct {
 	Timeout time.Duration `json:"-"`
 	Tasks   []*Task
 	CGroups []*CGroup `json:"-"`
-	Runner
+	Worker
 	anonymousCGroup *CGroup
 }
 
-type Task struct {
-	Name   string
-	CGroup string `json:"-"`
-	Probe  Prober
-	Runner
-	//DependsOn      *Task
-}
-
-func (t *Task) Start(ctx context.Context) (succ bool, err error) {
-	if err = t.EStatusRun(); err != nil {
-		return
-	}
-	succ = t.Probe.Start(context.WithValue(ctx, "id", t.Name))
-	err = t.EStatusFinish(succ)
-	return
-}
-
-type Result struct {
-	StartedAt time.Time
-	Runtime   time.Duration
-	Success   bool
-}
-
-func (r *Result) PrepareToStart() {
-	r.Success = false
-	r.StartedAt = time.Now()
-	r.Runtime = 0
-}
-
-func (r *Result) End(succ bool) {
-	r.Runtime = time.Since(r.StartedAt)
-	r.Success = succ
-}
-
-type CGroup struct {
-	Name string
-	Runner
-	Tasks []*Task
-}
-
-func (c *CGroup) addTask(task *Task) {
-	c.Tasks = append(c.Tasks, task)
+type ScriptResult struct {
+	Result
+	Status string
+	Tasks  []TaskResult
 }
 
 func (s *Script) newCGroup(name string) (c *CGroup) {
 	c = &CGroup{
-		Runner: Runner{
+		Worker: Worker{
 			EStatus: EStatusNew,
 		},
 	}
@@ -109,14 +70,34 @@ func (s *Script) AddTask(t *Task) {
 	s.Tasks = append(s.Tasks, t)
 }
 
-func NewTask(taskName string, cgroup string, probe Prober) (t *Task) {
-	t = &Task{
-		Name:   taskName,
-		CGroup: cgroup,
-		Probe:  probe,
-		Runner: Runner{
-			EStatus: EStatusNew,
-		},
+func (s *Script) Result() (r ScriptResult) {
+	rr, rs := s.Worker.Result()
+	r.Result = rr
+	r.Status = string(rs)
+	r.Tasks = make([]TaskResult, len(s.Tasks))
+	for i, t := range s.Tasks {
+		tr := TaskResult{}
+		tr.Name = t.Name
+		trr, trs := t.Result()
+		tr.Result = trr
+		tr.Status = string(trs)
+		tr.Probe = t.Probe.Result()
+		r.Tasks[i] = tr
+	}
+	return
+}
+
+func (s *Script) ResultFinished() (r ScriptResult) {
+	r.Result = s.Worker.ResultFinished()
+	r.Status = string(EStatusFinished)
+	r.Tasks = make([]TaskResult, len(s.Tasks))
+	for i, t := range s.Tasks {
+		tr := TaskResult{}
+		tr.Name = t.Name
+		tr.Result = t.ResultFinished()
+		tr.Status = string(EStatusFinished)
+		tr.Probe = t.Probe.ResultFinished()
+		r.Tasks[i] = tr
 	}
 	return
 }

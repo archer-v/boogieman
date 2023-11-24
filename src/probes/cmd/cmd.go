@@ -41,7 +41,7 @@ func New(options model.ProbeOptions, config Config) *Probe {
 	return &p
 }
 
-func (c *Probe) Runner(ctx context.Context) (succ bool) {
+func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 	var (
 		err      error
 		finished cmd.Status
@@ -114,13 +114,14 @@ func (c *Probe) Runner(ctx context.Context) (succ bool) {
 	if timeout != nil {
 		err = timeout
 		c.Finish(ctx)
-		return false
+		return false, nil
 	}
 
 	if finished.Exit != c.ExitCode {
 		err = fmt.Errorf("wrong exit code %v", finished.Exit)
 	}
-	return finished.Exit == c.ExitCode == c.Expect
+	succ = finished.Exit == c.ExitCode == c.Expect
+	return
 }
 
 func (c *Probe) Finisher(ctx context.Context) {

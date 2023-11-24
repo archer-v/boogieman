@@ -7,7 +7,6 @@ import (
 	"github.com/creasty/defaults"
 	"log"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -22,7 +21,7 @@ var DefaultProbeOptions ProbeOptions
 type ProbeOptions struct {
 	Timeout        time.Duration `json:"timeout,omitempty" default:"5000ms"`
 	StayBackground bool          `json:"stayBackground,omitempty"` // a probe runner should stay alive after check is finished
-	Expect         bool          `json:"expect,omitempty" default:"true"`
+	Expect         bool          `json:"expect" default:"true"`
 	Debug          bool          `json:"debug,omitempty" default:"false"`
 }
 
@@ -43,43 +42,37 @@ func (s *ProbeOptions) UnmarshalJSON(b []byte) (err error) {
 	return
 }
 
-type ProbeTimings struct {
-	Timings map[string]time.Duration
-	sync.Mutex
-}
-
-func (c *ProbeTimings) Set(name string, dur time.Duration) {
-	c.Lock()
-	if c.Timings == nil {
-		c.Timings = make(map[string]time.Duration)
-	}
-	c.Timings[name] = dur
-	c.Unlock()
-}
-
 // ProbeRunner is the probe runner that performs check
-type ProbeRunner func(ctx context.Context) (succ bool)
+type ProbeRunner func(ctx context.Context) (succ bool, resultObject any)
 
 // ProbeFinisher is the finish method for long-lived probe,
 // is called cleanup code at the script end
 type ProbeFinisher func(ctx context.Context)
 
 type ProbeHandler struct {
-	ProbeOptions `json:"options"`
-	Runner
-	Result
-	ProbeResult       any
-	Name              string                   // probe name
-	CanStayBackground bool                     `json:"-"` // flag that means the probing process can stay in background
-	runner            ProbeRunner              // probe runner
-	finisher          ProbeFinisher            // probe finisher, only for probe that stays alive in background
-	timings           map[string]time.Duration // timings data
-	logContext        string                   // log prefix string
-	error             error                    // last startup error
+	ProbeOptions      `json:"options"`
+	Worker                          // describes status o probe working process
+	lastResult        Result        // represents the last probe running Result
+	curResult         Result        // represents the current probe running Result
+	probingData       any           // a specific probe implementation saves a lastResult object here
+	Name              string        // probe name
+	CanStayBackground bool          `json:"-"` // flag that means the probing process can stay in background
+	runner            ProbeRunner   // probe runner func
+	finisher          ProbeFinisher // probe finisher func, only for probe that stays alive in background
+	//timings           map[string]time.Duration // timings data
+	logContext string // log prefix string
+	error      error  // last startup error
 	//	sync.Mutex
 }
 
-// Start starts the probing and returns a probing result, don't call directly
+type ProbeResult struct {
+	Name    string
+	Options ProbeOptions
+	Result
+	Data any
+}
+
+// Start starts the probing and returns a probing curResult, don't call directly
 func (c *ProbeHandler) Start(ctx context.Context) (succ bool) {
 	if c.runner == nil {
 		c.Log("runner isn't defined")
@@ -88,7 +81,8 @@ func (c *ProbeHandler) Start(ctx context.Context) (succ bool) {
 	if err := c.EStatusRun(); err != nil {
 		c.Log("wrong runner status: %v", err.Error())
 	}
-	c.Result.PrepareToStart()
+
+	c.curResult.PrepareToStart()
 
 	var ctxID string
 	if ctx != nil && ctx.Value("id") != nil {
@@ -96,9 +90,15 @@ func (c *ProbeHandler) Start(ctx context.Context) (succ bool) {
 	}
 	c.SetLogContext(ctxID)
 	c.logDebug("Starting the probe runner")
-	succ = c.runner(ctx)
+	succ, probingData := c.runner(ctx)
+
+	c.Lock()
+	c.curResult.End(succ)
+	c.lastResult = c.curResult
+	c.probingData = probingData
+	c.Unlock()
+
 	c.logDebug("The probe runner has been finished with success status: %v", succ)
-	c.Result.End(succ)
 
 	// todo do not clear && messy, need refactor
 	if !c.CanStayBackground || !succ || c.Error() != nil || !c.StayBackground {
@@ -177,7 +177,31 @@ func (c *ProbeHandler) Error() error {
 }
 
 func (c *ProbeHandler) IsAlive() bool {
-	return c.Runner.EStatus == EStatusRunning
+	return c.Worker.EStatus == EStatusRunning
+}
+
+func (c *ProbeHandler) Result() (r ProbeResult) {
+	c.Lock()
+	r.Name = c.Name
+	r.Options = c.ProbeOptions
+	if c.curResult.Completed() {
+		r.Result = c.lastResult
+		r.Data = c.probingData
+	} else {
+		r.Result = c.curResult
+	}
+	c.Unlock()
+	return
+}
+
+func (c *ProbeHandler) ResultFinished() (r ProbeResult) {
+	c.Lock()
+	r.Name = c.Name
+	r.Options = c.ProbeOptions
+	r.Result = c.lastResult
+	r.Data = c.probingData
+	c.Unlock()
+	return
 }
 
 type Prober interface {
@@ -185,4 +209,6 @@ type Prober interface {
 	Finish(ctx context.Context)
 	Error() error
 	IsAlive() bool
+	Result() (r ProbeResult)
+	ResultFinished() (r ProbeResult)
 }
