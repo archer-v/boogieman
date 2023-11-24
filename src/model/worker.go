@@ -15,46 +15,56 @@ const (
 	EStatusRunning  EStatus = "running"
 )
 
-type Runner struct {
-	Result
+type Worker struct {
+	prevResult Result
+	curResult  Result
 	EStatus
 	sync.Mutex
 }
 
-func (s *Runner) EStatusRun() (err error) {
+func (s *Worker) EStatusRun() (err error) {
 	s.Lock()
 	defer s.Unlock()
 	if s.EStatus == EStatusRunning {
 		return errors.New("already " + string(s.EStatus))
 	}
 	s.EStatus = EStatusRunning
-	s.Result.PrepareToStart()
+	s.curResult.PrepareToStart()
 	return
 }
 
-func (s *Runner) EStatusFinish(succ bool) (err error) {
+func (s *Worker) EStatusFinish(succ bool) (err error) {
 	s.Lock()
 	defer s.Unlock()
 	if s.EStatus != EStatusRunning {
 		return fmt.Errorf("can't switch from status %v to %v", string(s.EStatus), string(EStatusFinished))
 	}
 	s.EStatus = EStatusFinished
-	s.Result.End(succ)
+	s.curResult.End(succ)
+	s.prevResult = s.curResult
 	return
 }
 
-func (s *Runner) Duration() time.Duration {
-	if s.Result.Runtime == 0 && s.StartedAt != (time.Time{}) {
-		return time.Since(s.StartedAt)
+func (s *Worker) Duration() time.Duration {
+	if s.curResult.Runtime == 0 && s.curResult.StartedAt != (time.Time{}) {
+		return time.Since(s.curResult.StartedAt)
 	}
-	return s.Result.Runtime
+	return s.curResult.Runtime
 }
 
-/*
-type Worker struct {
-	PollInterval time.Runtime
-	CheckTimeout time.Runtime
-	Machine      Machine
-	//Checks       CheckPlan
+// Result returns a current worker status and a lastResult
+func (s *Worker) Result() (result Result, status EStatus) {
+	s.Lock()
+	defer s.Unlock()
+	status = s.EStatus
+	result = s.curResult
+	return
 }
-*/
+
+// ResultFinished returns a last finished worker status and a lastResult
+func (s *Worker) ResultFinished() (result Result) {
+	s.Lock()
+	defer s.Unlock()
+	result = s.prevResult
+	return
+}
