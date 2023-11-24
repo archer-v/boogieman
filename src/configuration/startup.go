@@ -122,7 +122,7 @@ func StartupConfiguration() (config StartupConfig, err error) {
 			err = fmt.Errorf("can't parse configuration from file: %v", e)
 			return
 		}
-		config.HttpPort = daemonConfig.General.HttpPort
+		config.HttpPort = daemonConfig.Global.HttpPort
 		config.ScheduleJobs = daemonConfig.Jobs
 	}
 	return

@@ -10,9 +10,9 @@ import (
 	"time"
 )
 
-type options struct {
-	DefaultSchedule string
-	HttpPort        int `default:"8091"`
+type GlobalOptions struct {
+	DefaultSchedule string `json:"default_schedule"`
+	HttpPort        int    `json:"http_port" default:"8091"`
 }
 
 type ScheduleJob struct {
@@ -25,8 +25,8 @@ type ScheduleJob struct {
 }
 
 type daemonConfig struct {
-	General options
-	Jobs    []ScheduleJob
+	Global GlobalOptions
+	Jobs   []ScheduleJob
 }
 
 func DaemonYMLConfiguration(data []byte) (config daemonConfig, err error) {
@@ -38,20 +38,20 @@ func DaemonYMLConfiguration(data []byte) (config daemonConfig, err error) {
 		return
 	}
 
-	for _, j := range config.Jobs {
+	for i, j := range config.Jobs {
 		var scriptData []byte
 		scriptData, err = os.ReadFile(j.ScriptFile)
 		if err != nil {
 			return
 		}
-		j.Script, err = ScriptYMLConfiguration(scriptData)
+		config.Jobs[i].Script, err = ScriptYMLConfiguration(scriptData)
 		if err != nil {
 			err = fmt.Errorf("can't parse configuration from %v: %w", j.ScriptFile, err)
 			return
 		}
-		j.Script.Timeout = time.Millisecond * j.Timeout
-		if j.Schedule == "" {
-			j.Schedule = config.General.DefaultSchedule
+		config.Jobs[i].Script.Timeout = time.Millisecond * j.Timeout
+		if config.Jobs[i].Schedule == "" {
+			config.Jobs[i].Schedule = config.Global.DefaultSchedule
 		}
 	}
 	return
