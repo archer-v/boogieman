@@ -76,11 +76,11 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 			break
 		case line := <-c.cmd.Stdout:
 			if c.LogDump {
-				log.Printf(line)
+				log.Print(line)
 			}
 		case line := <-c.cmd.Stderr:
 			if c.LogDump {
-				log.Printf(line)
+				log.Print(line)
 			}
 		}
 	}
@@ -90,7 +90,7 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 		if timeout != nil {
 			succ = true
 			// continue to read stdout/stderr of running process until channel closing
-			go func() {
+			go func(cmd *cmd.Cmd) {
 				var line string
 				ok := true
 				for ok {
@@ -99,12 +99,12 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 					case line, ok = <-c.cmd.Stderr:
 					}
 					if ok && c.LogDump && line != "" {
-						log.Printf(line)
+						log.Print(line)
 					}
 				}
 				// channel is closed
 				c.Finish(ctx)
-			}()
+			}(c.cmd)
 			return
 		}
 		succ = false
