@@ -11,6 +11,7 @@ require (
 	github.com/integrii/flaggy v1.5.2
 	github.com/kgadams/go-shellquote v0.0.0-20220913102612-f87aa9739d7c
 	github.com/prometheus-community/pro-bing v0.3.0
+	github.com/pseidemann/finish v1.2.0
 	github.com/starshiptroopers/uidgenerator v0.0.4
 	github.com/vrischmann/envconfig v1.3.0
 	golang.org/x/sys v0.14.0
