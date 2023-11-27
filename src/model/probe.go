@@ -36,7 +36,7 @@ func (s *ProbeOptions) UnmarshalJSON(b []byte) (err error) {
 	if err != nil {
 		return
 	}
-	t.Timeout = t.Timeout * time.Millisecond
+	t.Timeout *= time.Millisecond
 	*s = ProbeOptions(t)
 
 	return
@@ -59,7 +59,7 @@ type ProbeHandler struct {
 	CanStayBackground bool          `json:"-"` // flag that means the probing process can stay in background
 	runner            ProbeRunner   // probe runner func
 	finisher          ProbeFinisher // probe finisher func, only for probe that stays alive in background
-	//timings           map[string]time.Duration // timings data
+	// timings           map[string]time.Duration // timings data
 	logContext string // log prefix string
 	error      error  // last startup error
 	//	sync.Mutex
@@ -90,13 +90,28 @@ func (c *ProbeHandler) Start(ctx context.Context) (succ bool) {
 	}
 	c.SetLogContext(ctxID)
 	c.logDebug("Starting the probe runner")
-	succ, probingData := c.runner(ctx)
 
-	c.Lock()
-	c.curResult.End(succ)
-	c.lastResult = c.curResult
-	c.probingData = probingData
-	c.Unlock()
+	var probingData any
+	defer func() {
+		if err := recover(); err != nil {
+			log.Println(ctxID, "panic occurred:", err)
+			succ = false
+			_ = c.EStatusFinish(succ)
+		}
+
+		c.Lock()
+		c.curResult.End(succ)
+		c.lastResult = c.curResult
+		c.probingData = probingData
+		c.Unlock()
+
+		if succ {
+			c.Log("SUCCESS")
+		} else {
+			c.Log("FAIL")
+		}
+	}()
+	succ, probingData = c.runner(ctx)
 
 	c.logDebug("The probe runner has been finished with success status: %v", succ)
 
@@ -106,14 +121,6 @@ func (c *ProbeHandler) Start(ctx context.Context) (succ bool) {
 	} else {
 		c.logDebug("The probe process stays alive")
 	}
-
-	if succ {
-		c.Log("SUCCESS")
-	} else {
-		c.Log("FAIL")
-	}
-	//	c.SetLogContext("")
-
 	return
 }
 
