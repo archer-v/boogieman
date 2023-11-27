@@ -25,17 +25,17 @@ type startupOptions struct {
 
 type StartupConfig struct {
 	OneRun       bool
-	OutputJson   bool
+	JSON         bool
 	OutputPretty bool
-	HttpPort     int
+	BindTo       string
 	Script       *model.Script
-	ScheduleJobs []ScheduleJob
+	ScheduleJobs []model.ScheduleJob
 }
 
 func StartupConfiguration() (config StartupConfig, err error) {
 
 	var o startupOptions
-	//parse environment variables to the daemonConfig struct
+	// parse environment variables to the DaemonConfig struct
 	if err := envconfig.InitWithPrefix(&o, envPrefix); err != nil {
 		panic(err)
 	}
@@ -45,12 +45,12 @@ func StartupConfiguration() (config StartupConfig, err error) {
 	oneRun := flaggy.NewSubcommand("oneRun")
 	oneRun.Description = "performs a single run, print result and exit"
 
-	oneRun.String(&o.Script, "s", "script", "path to a checklist file in yml format")
-	oneRun.String(&o.ProbeName, "n", "probename", "a probeFactory name (ignored if script option is selected)")
-	oneRun.String(&o.ProbeConf, "o", "probeconf", "probeFactory daemonConfig data (ignored if script option is selected)")
-	oneRun.Duration(o.ProbeOptionsTimeout, "t", "timeout", "operation waiting timeout (ignored if script option is selected)")
+	oneRun.String(&o.Script, "s", "script", "path to a script file in yml format")
+	oneRun.String(&o.ProbeName, "n", "probename", "probe name to start (ignored if script option is selected)")
+	oneRun.String(&o.ProbeConf, "o", "probeconf", "probe configuration (ignored if script option is selected)")
+	oneRun.Duration(o.ProbeOptionsTimeout, "t", "timeout", "probe waiting timeout (ignored if script option is selected)")
 	oneRun.Bool(o.ProbeOptionsExpect, "e", "expect", "expected result true|false (ignored if script option is selected)")
-	oneRun.Bool(&config.OutputJson, "j", "json", "output result in JSON format")
+	oneRun.Bool(&config.JSON, "j", "json", "output result in JSON format")
 	oneRun.Bool(&config.OutputPretty, "J", "pretty", "pretty output with indent and CR")
 
 	daemon := flaggy.NewSubcommand("daemon")
@@ -98,7 +98,7 @@ func StartupConfiguration() (config StartupConfig, err error) {
 			}
 			config.Script, err = ScriptYMLConfiguration(data)
 			if err != nil {
-				err = fmt.Errorf("can't parse configuration from file: %v", err)
+				err = fmt.Errorf("can't parse configuration from file: %w", err)
 				return
 			}
 		}
@@ -119,10 +119,10 @@ func StartupConfiguration() (config StartupConfig, err error) {
 
 		daemonConfig, e := DaemonYMLConfiguration(data)
 		if e != nil {
-			err = fmt.Errorf("can't parse configuration from file: %v", e)
+			err = fmt.Errorf("can't parse configuration from file: %w", e)
 			return
 		}
-		config.HttpPort = daemonConfig.Global.HttpPort
+		config.BindTo = daemonConfig.Global.BindTo
 		config.ScheduleJobs = daemonConfig.Jobs
 	}
 	return
