@@ -38,6 +38,11 @@ func (r *Runner) Run(ctx context.Context) {
 
 	for _, cGroup := range r.script.CGroups {
 		r.runCgroup(ctx, cGroup)
+		select {
+		case <-ctx.Done():
+		default:
+
+		}
 	}
 
 	// finished
