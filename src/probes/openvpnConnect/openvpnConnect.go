@@ -50,6 +50,7 @@ func New(options model.ProbeOptions, config Config) *Probe {
 	return &p
 }
 
+//nolint:funlen
 func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 	var (
 		host           string
@@ -116,7 +117,7 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 				case line, ok = <-cmd.Stderr:
 				}
 				if ok && c.LogDump && line != "" {
-					log.Printf(line)
+					log.Print(line)
 				}
 			}
 			// channel is closed
@@ -155,12 +156,14 @@ func openvpnStart(ctx context.Context, configPath string, initTimeout time.Durat
 		select {
 		case finished = <-status:
 			break
+		case <-ctx.Done():
+			err = ctx.Err()
 		case <-timer:
 			err = ErrTimeout
 			break
 		case line := <-cmdRunner.Stdout:
 			if logout {
-				log.Printf(line)
+				log.Print(line)
 			}
 			if strings.Contains(line, "Initialization Sequence Completed") {
 				succ = true
@@ -172,7 +175,7 @@ func openvpnStart(ctx context.Context, configPath string, initTimeout time.Durat
 			}
 		case line := <-cmdRunner.Stderr:
 			if logout {
-				log.Printf(line)
+				log.Print(line)
 			}
 		}
 	}

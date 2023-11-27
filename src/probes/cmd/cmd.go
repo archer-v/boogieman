@@ -26,6 +26,7 @@ type Config struct {
 
 var name = "cmd"
 var ErrTimeout = errors.New("timeout")
+var ErrUnexpectedExit = errors.New("cmd exited unexpectedly")
 
 func init() {
 	probeFactory.RegisterProbe(constructor{probeFactory.BaseConstructor{Name: name}})
@@ -66,14 +67,20 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 	status := c.cmd.Start()
 
 	timer := time.After(c.Timeout)
-	var timeout error
-	for finished.Runtime == 0 && timeout == nil {
+	var timeoutError error
+	for finished.Runtime == 0 && timeoutError == nil {
 		select {
+		// cmd has been finished
 		case finished = <-status:
 			break
+		// context cancel is happened
+		case <-ctx.Done():
+			timeoutError = ctx.Err()
+		// timeoutError is happened
 		case <-timer:
-			timeout = ErrTimeout
+			timeoutError = ErrTimeout
 			break
+		// new lines in stdout / stderr
 		case line := <-c.cmd.Stdout:
 			if c.LogDump {
 				log.Print(line)
@@ -84,35 +91,38 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 			}
 		}
 	}
-
+	// if the process should stay background
 	if c.StayBackground {
-		// process waiting timeout is happened, process is still alive
-		if timeout != nil {
-			succ = true
-			// continue to read stdout/stderr of running process until channel closing
-			go func(cmd *cmd.Cmd) {
-				var line string
-				ok := true
-				for ok {
-					select {
-					case line, ok = <-c.cmd.Stdout:
-					case line, ok = <-c.cmd.Stderr:
-					}
-					if ok && c.LogDump && line != "" {
-						log.Print(line)
-					}
-				}
-				// channel is closed
-				c.Finish(ctx)
-			}(c.cmd)
+		// a waiting timeout isn't happened, it means the process exited unexpectedly
+		if timeoutError == nil {
+			c.Log("Command should stay background but exited unexpectedly")
+			succ = false
+			err = ErrUnexpectedExit
 			return
 		}
-		succ = false
+		// process waiting timeoutError is happened, process is still alive
+		succ = true
+		// continue to read stdout/stderr of running process until channel closing
+		go func(cmd *cmd.Cmd) {
+			var line string
+			ok := true
+			for ok {
+				select {
+				case line, ok = <-cmd.Stdout:
+				case line, ok = <-cmd.Stderr:
+				}
+				if ok && c.LogDump && line != "" {
+					log.Print(line)
+				}
+			}
+			// channel is closed
+			c.Finish(ctx)
+		}(c.cmd)
 		return
 	}
 
-	if timeout != nil {
-		err = timeout
+	if timeoutError != nil {
+		err = timeoutError
 		c.Finish(ctx)
 		return false, nil
 	}

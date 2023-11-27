@@ -5,12 +5,12 @@ import (
 	"boogieman/src/probeFactory"
 	"context"
 	"fmt"
+	"log"
 	"testing"
 	"time"
 )
 
 func Test_Runner(t *testing.T) {
-	ctx := context.Background()
 	defOptions := model.ProbeOptions{Timeout: time.Millisecond * 1000, Expect: true}
 
 	type testCase struct {
@@ -19,8 +19,16 @@ func Test_Runner(t *testing.T) {
 		options        model.ProbeOptions
 		expectedResult bool
 		expectedError  error
+		ctxTimeout     time.Duration
 	}
 
+	var testId string
+
+	defer func() {
+		if err := recover(); err != nil {
+			log.Println(testId, " panic occurred:", err)
+		}
+	}()
 	cases := []testCase{
 		{
 			"command with args is started and returns true",
@@ -28,6 +36,7 @@ func Test_Runner(t *testing.T) {
 			defOptions,
 			true,
 			nil,
+			0,
 		},
 		{
 			"command with args is started and returns false",
@@ -35,6 +44,7 @@ func Test_Runner(t *testing.T) {
 			defOptions,
 			false,
 			nil,
+			0,
 		},
 		{
 			"command with described as a string is started and returns true",
@@ -42,6 +52,7 @@ func Test_Runner(t *testing.T) {
 			defOptions,
 			true,
 			nil,
+			0,
 		},
 		{
 			"command is started and aborted with timeout and returns false",
@@ -49,6 +60,7 @@ func Test_Runner(t *testing.T) {
 			defOptions,
 			false,
 			nil,
+			0,
 		},
 		{
 			"command is started and stays alive and probe returns true",
@@ -56,13 +68,31 @@ func Test_Runner(t *testing.T) {
 			model.ProbeOptions{Timeout: time.Millisecond * 200, Expect: true, StayBackground: true},
 			true,
 			nil,
+			0,
 		},
 		{
 			"command is started and have to stays alive but finished and probe returns false",
 			Config{Cmd: "test/cmd_sleep.sh", Args: []string{"0.5", "0"}},
+			model.ProbeOptions{Timeout: time.Millisecond * 1000, Expect: true, StayBackground: true, Debug: true},
+			false,
+			nil,
+			0,
+		},
+		{
+			"command is started and will be interrupted with context.deadline and should returns false",
+			Config{Cmd: "test/cmd_sleep.sh", Args: []string{"1", "0"}},
+			model.ProbeOptions{Timeout: time.Millisecond * 1000, Expect: true, StayBackground: false},
+			false,
+			nil,
+			time.Millisecond * 500,
+		},
+		{
+			"command is started and have to stays alive but will be interrupted with context.deadline and should returns false",
+			Config{Cmd: "test/cmd_sleep.sh", Args: []string{"1", "0"}},
 			model.ProbeOptions{Timeout: time.Millisecond * 1000, Expect: true, StayBackground: true},
 			false,
 			nil,
+			time.Millisecond * 500,
 		},
 	}
 
@@ -72,18 +102,36 @@ func Test_Runner(t *testing.T) {
 		},
 	}
 	for i, c := range cases {
+		testId = fmt.Sprintf("test %v", i+1)
+		log.Printf("[%v] started", testId)
 		p, err := constructor.NewProbe(c.options, c.config)
 		if c.expectedError == nil && err != nil {
-			t.Errorf("Probe %v constructor returned error %v", i, err)
+			t.Errorf("[%v] probe constructor returned error %v", testId, err)
 			continue
 		} else if err != c.expectedError {
-			t.Errorf("Probe %v constructor should return error %v", i, c.expectedError)
+			t.Errorf("[%v] probe constructor should return error %v", testId, c.expectedError)
 			continue
 		}
-		if p.Start(context.WithValue(ctx, "id", fmt.Sprintf("test %v", i+1))) != c.expectedResult {
-			t.Errorf("Probe runner %v should return %v", i, c.expectedResult)
+		var (
+			ctx        context.Context
+			cancelFunc context.CancelFunc
+		)
+		if c.ctxTimeout == 0 {
+			ctx = context.Background()
 		} else {
-			p.Finish(ctx)
+			ctx, cancelFunc = context.WithTimeout(context.Background(), c.ctxTimeout)
 		}
+		if p.Start(context.WithValue(ctx, "id", testId)) != c.expectedResult {
+			t.Errorf("[%v] probe should return %v", testId, c.expectedResult)
+			if cancelFunc != nil {
+				cancelFunc()
+			}
+			continue
+		}
+		if cancelFunc != nil {
+			cancelFunc()
+		}
+		p.Finish(ctx)
+		log.Printf("[%v] OK", testId)
 	}
 }
