@@ -22,14 +22,14 @@ type Worker struct {
 	sync.Mutex
 }
 
-func (s *Worker) EStatusRun() (err error) {
+func (s *Worker) EStatusRun(id ...uint) (err error) {
 	s.Lock()
 	defer s.Unlock()
 	if s.EStatus == EStatusRunning {
 		return errors.New("already " + string(s.EStatus))
 	}
 	s.EStatus = EStatusRunning
-	s.curResult.PrepareToStart()
+	s.curResult.PrepareToStart(id...)
 	return
 }
 

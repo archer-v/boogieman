@@ -7,23 +7,30 @@ type Task struct {
 	CGroup string `json:"-"`
 	Probe  Prober
 	Worker
-	//DependsOn      *Task
+	runCounter uint
 }
 
 type TaskResult struct {
-	Name string
+	Name       string
+	ID         uint
+	RunCounter uint
 	Result
 	Status string
 	Probe  ProbeResult
 }
 
 func (t *Task) Start(ctx context.Context) (succ bool, err error) {
-	if err = t.EStatusRun(); err != nil {
+	t.runCounter++
+	if err = t.EStatusRun(t.runCounter); err != nil {
 		return
 	}
 	succ = t.Probe.Start(context.WithValue(ctx, "id", t.Name))
 	err = t.EStatusFinish(succ)
 	return
+}
+
+func (t *Task) RunCounter() uint {
+	return t.runCounter
 }
 
 func NewTask(taskName string, cgroup string, probe Prober) (t *Task) {
