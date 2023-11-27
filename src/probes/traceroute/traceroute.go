@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"github.com/archer-v/gotraceroute"
+	"github.com/creasty/defaults"
 	"log"
 	"strings"
 	"time"
@@ -57,6 +58,8 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 		Retries: c.Retries,
 	}
 
+	_ = defaults.Set(&c.Config)
+
 	defer func() {
 		if err != nil {
 			c.Log("[%v] %v, %vms", c.Host, err, c.Duration().Milliseconds())
@@ -95,17 +98,18 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 				break
 			}
 			if c.LogDump {
-				log.Printf(hop.StringHuman())
+				log.Print(hop.StringHuman())
 			}
 			for _, exp := range c.ExpectedHops {
 				if strings.Contains(hop.Node.String(), exp) {
-					if c.ExpectedMatch == "any" {
+					switch {
+					case c.ExpectedMatch == "any":
 						succ = true
 						finished = true
-					} else if c.ExpectedMatch == "none" {
+					case c.ExpectedMatch == "none":
 						succ = false
 						finished = true
-					} else if c.ExpectedMatch == "all" {
+					case c.ExpectedMatch == "all":
 						matches++
 						if matches == len(c.ExpectedHops) {
 							succ = true

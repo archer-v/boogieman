@@ -10,8 +10,6 @@ import (
 )
 
 func Test_Runner(t *testing.T) {
-
-	ctx := context.Background()
 	defOptions := model.ProbeOptions{Timeout: time.Millisecond * 5000, Expect: true}
 	constructor := constructor{
 		probeFactory.BaseConstructor{
@@ -25,60 +23,84 @@ func Test_Runner(t *testing.T) {
 		options        model.ProbeOptions
 		expectedResult bool
 		expectedError  error
+		ctxTimeout     time.Duration
 	}
 
 	cases := []testCase{
-		/*
-			{
-				"traceroute to an existent host",
-				Config{Host: "google.com", ExpectedHops: []string{"google.com"}, HopTimeout: time.Millisecond * 200, Retries: 2, LogDump: true},
-				defOptions,
-				true,
-				nil,
-			},
-			{
-				"traceroute to an existent host when config is defined in string",
-				"google.com,google.com",
-				defOptions,
-				true,
-				nil,
-			},
-			{
-				"wrong configuration",
-				"aaa",
-				defOptions,
-				false,
-				model.ErrorConfig,
-			},
-
-
-		*/
+		{
+			"traceroute to an existent host",
+			Config{Host: "google.com", ExpectedHops: []string{"google.com"}, HopTimeout: time.Millisecond * 100, Retries: 2, LogDump: true},
+			defOptions,
+			true,
+			nil,
+			0,
+		},
+		{
+			"traceroute to an existent host when config is defined in string",
+			"google.com,google.com",
+			defOptions,
+			true,
+			nil,
+			0,
+		},
+		{
+			"wrong configuration",
+			"aaa",
+			defOptions,
+			false,
+			model.ErrorConfig,
+			0,
+		},
 		{
 			"traceroute to wrong host",
+			Config{Host: "192.168.10.10", ExpectedHops: []string{"aaa"}, HopTimeout: time.Millisecond * 100, Retries: 2, LogDump: true},
+			defOptions,
+			false,
+			nil,
+			0,
+		},
+		{
+			"traceroute to wrong host with context timeout",
 			Config{Host: "192.168.10.10", ExpectedHops: []string{"aaa"}, HopTimeout: time.Millisecond * 200, Retries: 2, LogDump: true},
 			defOptions,
 			false,
 			nil,
+			time.Millisecond * 500,
 		},
 	}
 
 	for i, c := range cases {
 		caseName := fmt.Sprintf("test %v", i+1)
-		fmt.Printf("Executing case [%v]\n", caseName)
+		fmt.Printf("%v running\n", caseName)
 		p, err := constructor.NewProbe(c.options, c.config)
-		if c.expectedError == nil && err != nil {
+		switch {
+		case c.expectedError == nil && err != nil:
 			t.Errorf("Probe %v constructor returned error %v", i, err)
 			continue
-		} else if err != c.expectedError {
+		case err != c.expectedError:
 			t.Errorf("Probe %v constructor should return error %v", i, c.expectedError)
 			continue
-		} else if err != nil {
+		case err != nil:
 			continue
 		}
-		if p.Start(context.WithValue(ctx, "id", caseName)) != c.expectedResult {
-			t.Errorf("Probe runner %v should return %v", i, c.expectedResult)
+		var (
+			ctx        context.Context
+			cancelFunc context.CancelFunc
+		)
+		if c.ctxTimeout == 0 {
+			ctx = context.Background()
 		} else {
-			p.Finish(ctx)
+			ctx, cancelFunc = context.WithTimeout(context.Background(), c.ctxTimeout)
 		}
+		rz := p.Start(context.WithValue(ctx, "id", caseName))
+		if cancelFunc != nil {
+			cancelFunc()
+		}
+		if rz != c.expectedResult {
+			t.Errorf("Probe runner %v should return %v", i, c.expectedResult)
+			continue
+		}
+		p.Finish(ctx)
+		fmt.Printf("%v OK\n", caseName)
 	}
 }
