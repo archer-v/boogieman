@@ -10,7 +10,7 @@ import (
 )
 
 type script struct {
-	//Timeout time.Duration `default:"60s"`
+	// Timeout time.Duration `default:"60s"`
 	Script []record
 }
 
@@ -18,7 +18,7 @@ type record struct {
 	Name   string
 	Probe  probe
 	CGroup string
-	//DependsOn      string
+	// DependsOn      string
 }
 
 type probe struct {
@@ -39,7 +39,7 @@ func ScriptYMLConfiguration(data []byte) (s *model.Script, err error) {
 		return
 	}
 
-	//s.Tasks = make([]*model.Task, len(parsed.script))
+	// s.Tasks = make([]*model.Task, len(parsed.script))
 	var p model.Prober
 	for _, v := range parsed.Script {
 		var config any
@@ -49,10 +49,10 @@ func ScriptYMLConfiguration(data []byte) (s *model.Script, err error) {
 			err = fmt.Errorf("[%v] %w", v.Name, err)
 			return
 		}
-		// try to fill daemonConfig from RawConfiguration data
+		// try to fill DaemonConfig from RawConfiguration data
 		if v.Probe.RawConfiguration != nil {
 			e := json.Unmarshal(*v.Probe.RawConfiguration, config)
-			// if unmarshal error, set daemonConfig to raw data in order the probe try to parse daemonConfig by itself
+			// if unmarshal error, set DaemonConfig to raw data in order the probe try to parse DaemonConfig by itself
 			if e != nil {
 				config = []byte(*v.Probe.RawConfiguration)
 			}

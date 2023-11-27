@@ -12,7 +12,7 @@ import (
 
 type GlobalOptions struct {
 	DefaultSchedule string `json:"default_schedule"`
-	HttpPort        int    `json:"http_port" default:"8091"`
+	HTTPPort        int    `json:"http_port" default:"8091"`
 }
 
 type ScheduleJob struct {
@@ -24,12 +24,12 @@ type ScheduleJob struct {
 	Script     *model.Script `json:"-"`
 }
 
-type daemonConfig struct {
+type DaemonConfig struct {
 	Global GlobalOptions
 	Jobs   []ScheduleJob
 }
 
-func DaemonYMLConfiguration(data []byte) (config daemonConfig, err error) {
+func DaemonYMLConfiguration(data []byte) (config DaemonConfig, err error) {
 
 	if err = defaults.Set(&config); err != nil {
 		return
