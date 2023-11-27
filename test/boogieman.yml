@@ -1,10 +1,10 @@
 global:
   default_schedule: 60s
-  http_port: 8091
+  bind_to: localhost:9091
 jobs:
   - script: test/script-openvpn.yml
     name: Test job 1
-    schedule: 0-30 * * * * * #sec, min, hour, day, month, day of week
+    schedule: 10 * * * * * #sec, min, hour, day, month, day of week
     timeout: 30000
   - script: test/script-simple.yml
     name: Test job 2
