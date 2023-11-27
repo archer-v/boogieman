@@ -4,7 +4,6 @@ import (
 	"boogieman/src/model"
 	"fmt"
 	"github.com/creasty/defaults"
-	"github.com/go-co-op/gocron"
 	"os"
 	"sigs.k8s.io/yaml" // use it instead gopkg.in/yaml.v3 as it also supports json attributes in struct
 	"time"
@@ -12,25 +11,15 @@ import (
 
 type GlobalOptions struct {
 	DefaultSchedule string `json:"default_schedule"`
-	HTTPPort        int    `json:"http_port" default:"8091"`
-}
-
-type ScheduleJob struct {
-	Name       string
-	ScriptFile string `json:"script"`
-	Schedule   string
-	Timeout    time.Duration
-	CronJob    *gocron.Job   `json:"-"`
-	Script     *model.Script `json:"-"`
+	BindTo          string `json:"bind_to" default:"localhost:9091"`
 }
 
 type DaemonConfig struct {
 	Global GlobalOptions
-	Jobs   []ScheduleJob
+	Jobs   []model.ScheduleJob
 }
 
 func DaemonYMLConfiguration(data []byte) (config DaemonConfig, err error) {
-
 	if err = defaults.Set(&config); err != nil {
 		return
 	}
