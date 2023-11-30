@@ -3,22 +3,17 @@ package model
 import "time"
 
 type Result struct {
-	ID        uint
-	StartedAt time.Time
-	Runtime   time.Duration
-	Success   bool
+	StartedAt  time.Time     `json:"startedAt"`
+	Runtime    time.Duration `json:"runtime"`
+	Success    bool          `json:"success"`
+	RunCounter uint          `json:"runCounter"` // run counter
 }
 
-func (r *Result) PrepareToStart(id ...uint) {
-	if len(id) > 0 {
-		r.ID = id[0]
-	} else {
-		r.ID = 0
-	}
-
+func (r *Result) PrepareToStart() {
 	r.Success = false
 	r.StartedAt = time.Now()
 	r.Runtime = 0
+	r.RunCounter++
 }
 
 func (r *Result) End(succ bool) {
