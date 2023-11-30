@@ -10,8 +10,21 @@ import (
 
 var logger = log.New(os.Stdout, "", log.LstdFlags)
 
-func Run(bindTo string) (srv *http.Server, err error) {
+type Handlers []WebServed
+
+type WebServed interface {
+	UrlPatters() []string
+	ServeHTTP(http.ResponseWriter, *http.Request)
+}
+
+func Run(bindTo string, handlers Handlers) (srv *http.Server, err error) {
 	srv = &http.Server{Addr: bindTo, ReadHeaderTimeout: time.Second}
+
+	for _, v := range handlers {
+		for _, h := range v.UrlPatters() {
+			http.Handle(h, v)
+		}
+	}
 
 	startupError := make(chan error)
 	go func() {
