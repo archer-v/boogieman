@@ -2,7 +2,6 @@ package main
 
 import (
 	"boogieman/src/configuration"
-	"boogieman/src/runner"
 	"boogieman/src/services/scheduler"
 	"boogieman/src/services/webserver"
 	"context"
@@ -29,7 +28,6 @@ var gitTag, gitCommit, gitBranch, buildTimestamp, version string
 var finisher = &finish.Finisher{Timeout: ShutdownWaitingTimeout}
 
 func main() {
-
 	if buildTimestamp == "" {
 		version = "version: DEV"
 	} else {
@@ -51,17 +49,17 @@ func main() {
 	schedulerService := scheduler.Run()
 	finisher.Add(schedulerService, finish.WithName("scheduler"))
 
-	webService, err := webserver.Run(config.BindTo)
+	webService, err := webserver.Run(config.BindTo, []webserver.WebServed{schedulerService})
 	if err != nil {
 		fmt.Print(err.Error())
 		os.Exit(ExitErrConfig)
 	}
 	finisher.Add(webService, finish.WithName("web server"))
 
-	for i, _ := range config.ScheduleJobs {
-		err = schedulerService.AddJob(&config.ScheduleJobs[i])
+	for _, j := range config.ScheduleJobs {
+		err = schedulerService.AddJob(j)
 		if err != nil {
-			log.Printf("[%v] error with creating a scheduling job: %v", config.ScheduleJobs[i].Name, err)
+			log.Printf("[%v] error with creating a scheduling job: %v", j.Name, err)
 		}
 	}
 	finisher.Wait()
@@ -69,9 +67,8 @@ func main() {
 }
 
 func runScriptAndExit(config configuration.StartupConfig) {
-	runner := runner.NewRunner(config.Script)
 	ctx := context.Background()
-	runner.Run(ctx)
+	config.Script.Run(ctx)
 	if config.JSON {
 		var d []byte
 		if config.OutputPretty {
@@ -82,12 +79,12 @@ func runScriptAndExit(config configuration.StartupConfig) {
 		fmt.Println(string(d))
 	}
 
-	d, _ := json.MarshalIndent(runner.Result(), "", "    ")
+	d, _ := json.MarshalIndent(config.Script.Result(), "", "    ")
 	fmt.Println(string(d))
 
-	if runner.Result().Success {
+	if config.Script.Result().Success {
 		os.Exit(ExitOk)
-	} else {
-		os.Exit(ExitFailed)
 	}
+
+	os.Exit(ExitFailed)
 }
