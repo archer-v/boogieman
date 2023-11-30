@@ -1,10 +1,8 @@
 # boogieman
-The probing utility (and golang library) to monitor availability of host nodes, networks, services and processes.
-It's intended as a lightweight simple utility as part of automation scripts in different DevOPS scenarios and NOC working processes. All probes and scenarios expose their data as Prometheus metrics and this utility can be used as source of hosts, networks and services availability metrics.
+The probing utility (and golang library) for monitoring availability of host nodes, networks, services and processes.
+It's intended as a lightweight simple utility as part of automation scripts in different DevOPS and NOC operations. All probes  expose their data as Prometheus metrics and this utility can be used as source of hosts, networks and services availability metrics.
 
-Two working modes available: console utility for single scenario or probe run or a daemon for regular scheduled probing. 
-
-Utility can perform single or composite checks combined in a scenario described in configuration file in a YAML format
+The utility can perform single or composite checks combined in a scenario described in configuration file in a YAML format
 
 Available checks (probes): 
 - ping
@@ -14,13 +12,13 @@ Available checks (probes):
 - traceroute (with expecting a host in a route)
 - any additional probes can be created
 
-All probes can returns addiotional data, like timings, routes, etc. 
+All probes can returns addiotional data, like probe timings, response codes, commands stdout, etc
 
 Working modes
-- console mode: with text or JSON output
-- continuos monitoring mode: perform regular checks and exposes the results as prometheus metrics or json
+- console mode: performs single scenario or probe run with text or JSON output to stdout
+- continuos monitoring mode: performs regular checks and exposes the results as prometheus metrics or json
 
-Probes in a scenario can be configured to execute simultaneously so the entire scenario can perform quickly. Configurable timeouts are supported for all checks. 
+Several probes in a scenario can be configured to execute simultaneously so the entire scenario can perform quickly. Configurable timeouts are supported for all checks. 
 
 Scenario file example:
 
@@ -59,7 +57,7 @@ script:
           - 192.168.105.105
 ```
 
-Regular jobs configuration file example:
+Daemon configuration file example:
 ```
 global:
   default_schedule: 60s #execute every 60 seconds
@@ -79,7 +77,7 @@ HTTP api endpoints:
 * /jobs - returns current job list in schedule queue
 
 
-/job response example:
+/job endpoint response example:
 ```
 {
    "result":{
@@ -162,7 +160,7 @@ HTTP api endpoints:
 }
 ```
 
-/jobs response example:
+/jobs endpoint response example:
 ```
 [
    {
