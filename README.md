@@ -1,5 +1,5 @@
 # boogieman
-The probing utility (and golang library) to monitor the availability of host nodes, networks, services and processes.
+The probing utility (and golang library) to monitor availability of host nodes, networks, services and processes.
 It's intended as a lightweight simple utility as part of automation scripts in different DevOPS scenarios and NOC working processes. All probes and scenarios expose their data as Prometheus metrics and this utility can be used as source of hosts, networks and services availability metrics.
 
 Two working modes available: console utility for single scenario or probe run or a daemon for regular scheduled probing. 
