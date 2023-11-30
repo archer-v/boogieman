@@ -1,9 +1,10 @@
 # boogieman
 The probing utility (and golang library) to monitor the availability of host nodes, networks, services and processes.
-It's intended to use as part of automation scripts in different DevOPS scenarios and NOC working processes.  
-Two working modes available: as a console utility for fast check or a daemon for regular scheduled probing. 
+It's intended as a lightweight simple utility as part of automation scripts in different DevOPS scenarios and NOC working processes. All probes and scenarios expose their data as Prometheus metrics and this utility can be used as source of hosts, networks and services availability metrics.
 
-Utility can perform single checks or composite checks combined in a scenario described in configuration file in a YAML format
+Two working modes available: console utility for single scenario or probe run or a daemon for regular scheduled probing. 
+
+Utility can perform single or composite checks combined in a scenario described in configuration file in a YAML format
 
 Available checks (probes): 
 - ping
@@ -13,11 +14,13 @@ Available checks (probes):
 - traceroute (with expecting a host in a route)
 - any additional probes can be created
 
+All probes can returns addiotional data, like timings, routes, etc. 
+
 Working modes
 - console mode: with text or JSON output
 - continuos monitoring mode: perform regular checks and exposes the results as prometheus metrics or json
 
-All probes in a scenario can be executed simultaneously so the entire scenario can perform quickly. Configurable timeouts are supported for all checks. 
+Probes in a scenario can be configured to execute simultaneously so the entire scenario can perform quickly. Configurable timeouts are supported for all checks. 
 
 Scenario file example:
 
