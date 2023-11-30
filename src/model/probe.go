@@ -66,10 +66,10 @@ type ProbeHandler struct {
 }
 
 type ProbeResult struct {
-	Name    string
-	Options ProbeOptions
-	Result
-	Data any
+	Name    string       `json:"name"`
+	Options ProbeOptions `json:"options"`
+	Result  `json:"result"`
+	Data    any `json:"data"`
 }
 
 // Start starts the probing and returns a probing curResult, don't call directly
