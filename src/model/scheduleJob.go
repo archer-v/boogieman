@@ -6,11 +6,11 @@ import (
 )
 
 type ScheduleJob struct {
-	Name       string
-	ScriptFile string `json:"script"`
-	Schedule   string
-	Once       bool
-	Timeout    time.Duration
-	Script     *Script
-	CronJob    *gocron.Job
+	Name       string        `json:"name"`
+	ScriptFile string        `json:"script"`
+	Schedule   string        `json:"schedule"`
+	Once       bool          `json:"once"`
+	Timeout    time.Duration `json:"timeout"`
+	Script     *Script       `json:"-"`
+	CronJob    *gocron.Job   `json:"-"`
 }
