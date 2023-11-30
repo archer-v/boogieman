@@ -42,6 +42,14 @@ func (s *ProbeOptions) UnmarshalJSON(b []byte) (err error) {
 	return
 }
 
+func (s *ProbeOptions) MarshalJSON() ([]byte, error) {
+	// Time should be represented in milliseconds
+	type Options ProbeOptions
+	o := Options(*s)
+	o.Timeout = time.Duration(o.Timeout.Milliseconds())
+	return json.Marshal(&o)
+}
+
 // ProbeRunner is the probe runner that performs check
 type ProbeRunner func(ctx context.Context) (succ bool, resultObject any)
 
@@ -68,8 +76,8 @@ type ProbeHandler struct {
 type ProbeResult struct {
 	Name    string       `json:"name"`
 	Options ProbeOptions `json:"options"`
-	Result  `json:"result"`
-	Data    any `json:"data"`
+	Result
+	Data any `json:"data"`
 }
 
 // Start starts the probing and returns a probing curResult, don't call directly

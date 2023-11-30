@@ -10,10 +10,10 @@ type Task struct {
 }
 
 type TaskResult struct {
-	Name   string `json:"name"`
-	Result `json:"result"`
+	Name   string      `json:"name"`
 	Status string      `json:"status"`
 	Probe  ProbeResult `json:"probe"`
+	Result
 }
 
 func (t *Task) Start(ctx context.Context) (succ bool, err error) {
