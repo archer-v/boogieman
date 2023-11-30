@@ -162,7 +162,7 @@ HTTP api endpoints:
 }
 ```
 
-/jobs responce example:
+/jobs response example:
 ```
 [
    {
