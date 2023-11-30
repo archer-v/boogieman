@@ -1,7 +1,10 @@
 package model
 
 import (
+	"context"
+	"github.com/enriquebris/goconcurrentqueue"
 	"github.com/starshiptroopers/uidgenerator"
+	"sync"
 	"time"
 )
 
@@ -23,36 +26,59 @@ type Script struct {
 	Tasks   []*Task
 	CGroups []*CGroup `json:"-"`
 	Worker
-	anonymousCGroup *CGroup
+	anonymousCGroup   *CGroup
+	probesStayedAlive *goconcurrentqueue.FIFO
 }
 
 type ScriptResult struct {
-	Result
-	Status string
-	Tasks  []TaskResult
+	Result `json:"result"`
+	Status string       `json:"status"`
+	Tasks  []TaskResult `json:"tasks"`
 }
 
-func (s *Script) newCGroup(name string) (c *CGroup) {
-	c = &CGroup{
-		Worker: Worker{
-			EStatus: EStatusNew,
-		},
+// Run starts the script and blocks until finish
+func (s *Script) Run(ctx context.Context) {
+	if s.probesStayedAlive == nil {
+		s.probesStayedAlive = goconcurrentqueue.NewFIFO()
 	}
-	if name != "" {
-		c.Name = name
-	} else {
-		c.Name = uidGenerator.New()
+	if err := s.EStatusRun(); err != nil {
+		s.log(err.Error())
+		return
 	}
 
-	s.CGroups = append(s.CGroups, c)
-	return
+	for _, cGroup := range s.CGroups {
+		s.runCgroup(ctx, cGroup)
+		select {
+		case <-ctx.Done():
+		default:
+		}
+	}
+
+	// finished
+	succ := true
+	for _, t := range s.Tasks {
+		taskResult, _ := t.Worker.Result()
+		succ = succ && taskResult.Success
+	}
+
+	_ = s.EStatusFinish(succ)
+
+	// finishing background probes stayed alive
+	for i, e := s.probesStayedAlive.Dequeue(); e == nil; i, e = s.probesStayedAlive.Dequeue() {
+		probe, ok := i.(Prober)
+		if !ok {
+			s.log("wrong queue object type")
+			continue
+		}
+		probe.Finish(ctx)
+	}
 }
 
 func (s *Script) AddTask(t *Task) {
 	if s.EStatus != EStatusNew {
 		return
 	}
-	// task without defined concurrent group will be assigned to a new created default concurrent group
+	// task without concurrent group will be assigned to a new created default concurrent group
 	if t.CGroup == "" {
 		if s.anonymousCGroup == nil || (len(s.Tasks) > 0 && s.Tasks[len(s.Tasks)-1].CGroup != s.anonymousCGroup.Name) {
 			s.anonymousCGroup = s.newCGroup("")
@@ -76,13 +102,7 @@ func (s *Script) Result() (r ScriptResult) {
 	r.Status = string(rs)
 	r.Tasks = make([]TaskResult, len(s.Tasks))
 	for i, t := range s.Tasks {
-		tr := TaskResult{}
-		tr.Name = t.Name
-		trr, trs := t.Result()
-		tr.Result = trr
-		tr.Status = string(trs)
-		tr.Probe = t.Probe.Result()
-		r.Tasks[i] = tr
+		r.Tasks[i] = t.Result()
 	}
 	return
 }
@@ -92,12 +112,63 @@ func (s *Script) ResultFinished() (r ScriptResult) {
 	r.Status = string(EStatusFinished)
 	r.Tasks = make([]TaskResult, len(s.Tasks))
 	for i, t := range s.Tasks {
-		tr := TaskResult{}
-		tr.Name = t.Name
-		tr.Result = t.ResultFinished()
-		tr.Status = string(EStatusFinished)
-		tr.Probe = t.Probe.ResultFinished()
-		r.Tasks[i] = tr
+		r.Tasks[i] = t.ResultFinished()
 	}
 	return
+}
+
+func (s *Script) newCGroup(name string) (c *CGroup) {
+	c = &CGroup{
+		Worker: Worker{
+			EStatus: EStatusNew,
+		},
+	}
+	if name != "" {
+		c.Name = name
+	} else {
+		c.Name = uidGenerator.New()
+	}
+
+	s.CGroups = append(s.CGroups, c)
+	return
+}
+
+func (s *Script) runCgroup(ctx context.Context, cgroup *CGroup) (succ bool) {
+	if err := cgroup.EStatusRun(); err != nil {
+		s.log("[cgroup][%v] %v", cgroup.Name, err.Error())
+		return
+	}
+
+	ctx = context.WithValue(ctx, "cgroup", cgroup.Name)
+
+	var wg sync.WaitGroup
+	for _, task := range cgroup.Tasks {
+		wg.Add(1)
+		go func(task *Task) {
+			defer func() {
+				wg.Done()
+			}()
+
+			_, err := task.Start(ctx)
+			if err != nil {
+				s.log("[task][%v] %v", task.Name, err.Error())
+			}
+
+			if task.Probe.IsAlive() {
+				_ = s.probesStayedAlive.Enqueue(task.Probe)
+			}
+		}(task)
+	}
+	wg.Wait()
+	succ = true
+	for _, t := range s.Tasks {
+		taskResult, _ := t.Worker.Result()
+		succ = succ && taskResult.Success
+	}
+	_ = cgroup.EStatusFinish(succ)
+	return
+}
+
+func (s *Script) log(format string, args ...any) {
+	Logger.Printf("[runner]"+format+"\n", args...)
 }
