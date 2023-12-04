@@ -2,6 +2,7 @@ package main
 
 import (
 	"boogieman/src/configuration"
+	"boogieman/src/services/prometheus"
 	"boogieman/src/services/scheduler"
 	"boogieman/src/services/webserver"
 	"context"
@@ -49,7 +50,10 @@ func main() {
 	schedulerService := scheduler.Run()
 	finisher.Add(schedulerService, finish.WithName("scheduler"))
 
-	webService, err := webserver.Run(config.BindTo, []webserver.WebServed{schedulerService})
+	// prometheus
+	promCollector := prometheus.Run(true, true)
+
+	webService, err := webserver.Run(config.BindTo, []webserver.WebServed{schedulerService, promCollector})
 	if err != nil {
 		fmt.Print(err.Error())
 		os.Exit(ExitErrConfig)
