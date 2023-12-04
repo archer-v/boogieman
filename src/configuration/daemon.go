@@ -33,7 +33,8 @@ func DaemonYMLConfiguration(data []byte) (config DaemonConfig, err error) {
 		if err != nil {
 			return
 		}
-		config.Jobs[i].Script, err = ScriptYMLConfiguration(scriptData)
+		// job custom variables is defined
+		config.Jobs[i].Script, err = ScriptYMLConfiguration(scriptData, j.Vars)
 		if err != nil {
 			err = fmt.Errorf("can't parse configuration from %v: %w", j.ScriptFile, err)
 			return

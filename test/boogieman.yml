@@ -6,6 +6,14 @@ jobs:
     name: TestJob1
     schedule: 10 * * * * * #sec, min, hour, day, month, day of week
     timeout: 30000
+    vars:
+      vpn-connect:
+        remote_host: 127.0.0.3
   - script: test/script-simple.yml
     name: TestJob2
     timeout: 10000
+    vars:
+      gateway-alive:
+        hosts: 127.0.0.3, 127.0.0.4
+      internet-alive:
+        urls: https://msn.com/

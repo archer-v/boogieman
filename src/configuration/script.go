@@ -11,14 +11,13 @@ import (
 
 type script struct {
 	// Timeout time.Duration `default:"60s"`
-	Script []record
+	Script []task
 }
 
-type record struct {
+type task struct {
 	Name   string
 	Probe  probe
 	CGroup string
-	// DependsOn      string
 }
 
 type probe struct {
@@ -29,7 +28,7 @@ type probe struct {
 	Expect           bool
 }
 
-func ScriptYMLConfiguration(data []byte) (s *model.Script, err error) {
+func ScriptYMLConfiguration(data []byte, overrideConfigOptions ...map[string]map[string]string) (s *model.Script, err error) {
 	s = &model.Script{}
 	parsed := script{}
 	if err = defaults.Set(&parsed); err != nil {
@@ -39,31 +38,45 @@ func ScriptYMLConfiguration(data []byte) (s *model.Script, err error) {
 		return
 	}
 
-	// s.Tasks = make([]*model.Task, len(parsed.script))
+	var configOptions map[string]map[string]string
+	if len(overrideConfigOptions) > 0 {
+		configOptions = overrideConfigOptions[0]
+	} else {
+		configOptions = make(map[string]map[string]string)
+	}
 	var p model.Prober
-	for _, v := range parsed.Script {
+	for _, t := range parsed.Script {
 		var config any
 		// get the probe configuration struct
-		config, err = probeFactory.NewProbeConfiguration(v.Probe.Name)
+		config, err = probeFactory.NewProbeConfiguration(t.Probe.Name)
 		if err != nil {
-			err = fmt.Errorf("[%v] %w", v.Name, err)
+			err = fmt.Errorf("[%v] %w", t.Name, err)
 			return
 		}
-		// try to fill DaemonConfig from RawConfiguration data
-		if v.Probe.RawConfiguration != nil {
-			e := json.Unmarshal(*v.Probe.RawConfiguration, config)
-			// if unmarshal error, set DaemonConfig to raw data in order the probe try to parse DaemonConfig by itself
-			if e != nil {
-				config = []byte(*v.Probe.RawConfiguration)
+		// try to fill probe config from RawConfiguration data
+		if t.Probe.RawConfiguration != nil {
+			if e := json.Unmarshal(*t.Probe.RawConfiguration, config); e == nil {
+				// override config properties if there are options in configOptions for this task (task name)
+				if o, ok := configOptions[t.Name]; ok {
+					for fName, fValue := range o {
+						if e = setStructField(config, fName, fValue); e != nil {
+							err = fmt.Errorf("[%v] %w", t.Name, e)
+							return
+						}
+					}
+				}
+			} else {
+				// if unmarshal error, set probe config to raw data in order the probe try to parse raw data by itself
+				config = []byte(*t.Probe.RawConfiguration)
 			}
 		}
 
-		p, err = probeFactory.NewProbe(v.Probe.Name, v.Probe.Options, config)
+		p, err = probeFactory.NewProbe(t.Probe.Name, t.Probe.Options, config)
 		if err != nil {
-			err = fmt.Errorf("[%v] %w", v.Name, err)
+			err = fmt.Errorf("[%v] %w", t.Name, err)
 			return
 		}
-		s.AddTask(model.NewTask(v.Name, v.CGroup, p))
+		s.AddTask(model.NewTask(t.Name, t.CGroup, p))
 	}
 	return
 }
