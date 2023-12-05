@@ -17,13 +17,6 @@ type Probe struct {
 	cmd    *cmd.Cmd
 }
 
-type Config struct {
-	Cmd      string // path to openvpn client configuration file
-	Args     []string
-	ExitCode int
-	LogDump  bool
-}
-
 var name = "cmd"
 var ErrTimeout = errors.New("timeout")
 var ErrUnexpectedExit = errors.New("cmd exited unexpectedly")
@@ -37,11 +30,13 @@ func New(options model.ProbeOptions, config Config) *Probe {
 	p.ProbeOptions = options
 	p.Name = name
 	p.Config = config
+	p.ProbeHandler.Config = config
 	p.CanStayBackground = true
 	p.SetRunner(p.Runner).SetFinisher(p.Finisher)
 	return &p
 }
 
+//nolint:funlen
 func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 	var (
 		err      error
@@ -134,7 +129,7 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 	return
 }
 
-func (c *Probe) Finisher(ctx context.Context) {
+func (c *Probe) Finisher(context.Context) {
 	if c.cmd != nil {
 		err := c.cmd.Stop()
 		if err != nil {

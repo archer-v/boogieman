@@ -5,7 +5,6 @@ import (
 	"boogieman/src/probeFactory"
 	"errors"
 	"fmt"
-	"github.com/kgadams/go-shellquote"
 	"golang.org/x/sys/unix"
 	"os"
 	"os/exec"
@@ -16,7 +15,6 @@ type constructor struct {
 }
 
 func (c constructor) NewProbe(options model.ProbeOptions, configuration any) (p model.Prober, err error) {
-
 	var config Config
 	if config, err = c.configuration(configuration); err != nil {
 		return
@@ -31,23 +29,16 @@ func (c constructor) NewProbeConfiguration() any {
 
 // configuration casts configuration of any type to Config struct
 func (c constructor) configuration(conf any) (config Config, err error) {
-
 	if conf == nil {
 		err = model.ErrorConfig
 		return
 	}
 
 	if str, ok := conf.(string); ok {
-		args, e := shellquote.Split(str)
-		if len(args) == 0 || args[0] == "" {
-			err = model.ErrorConfig
+		config = Config{}
+		if err = config.initWithString(str); err != nil {
 			return
 		}
-		if e != nil {
-			err = fmt.Errorf("can't parse cmd: %w", err)
-			return
-		}
-		config = Config{Cmd: args[0], Args: args[1:]}
 	} else if c, ok := conf.(*Config); ok {
 		config = *c
 	} else if c, ok := conf.(Config); ok {
@@ -55,6 +46,12 @@ func (c constructor) configuration(conf any) (config Config, err error) {
 	} else {
 		err = model.ErrorConfig
 		return
+	}
+	// if no Args, config.Cmd can contain 'shell-like' command string, parse it
+	if len(config.Args) == 0 {
+		if err = config.initWithString(config.Cmd); err != nil {
+			return
+		}
 	}
 
 	path, err := exec.LookPath(config.Cmd)
