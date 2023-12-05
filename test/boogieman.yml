@@ -17,3 +17,9 @@ jobs:
         hosts: 127.0.0.3, 127.0.0.4
       internet-alive:
         urls: https://msn.com/
+  - script: test/script-cmd.yml
+    name: TestJob3
+    timeout: 1000
+    vars:
+      gateway-alive-cmd-ping:
+        cmd: ping -c 3 -i 0.1 192.168.168.168
