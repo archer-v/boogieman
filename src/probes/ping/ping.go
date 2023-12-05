@@ -34,6 +34,7 @@ func New(options model.ProbeOptions, config Config) *Probe {
 	p.ProbeOptions = options
 	p.Name = name
 	p.Config = config
+	p.ProbeHandler.Config = config
 	p.SetRunner(p.Runner)
 	return &p
 }

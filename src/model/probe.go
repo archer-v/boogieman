@@ -50,32 +50,32 @@ func (s *ProbeOptions) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&o)
 }
 
-// ProbeRunner is the probe runner that performs check
+// ProbeRunner is the probe runner that performs a probe work
 type ProbeRunner func(ctx context.Context) (succ bool, resultObject any)
 
 // ProbeFinisher is the finish method for long-lived probe,
-// is called cleanup code at the script end
+// is called by cleanup code at the script end
 type ProbeFinisher func(ctx context.Context)
 
 type ProbeHandler struct {
 	ProbeOptions      `json:"options"`
-	Worker                          // describes status o probe working process
+	Worker                   // describes status o probe working process
+	Name              string // probe name
+	Config            any
+	CanStayBackground bool          `json:"-"` // flag that means the probing process can stay in background
 	lastResult        Result        // represents the last probe running Result
 	curResult         Result        // represents the current probe running Result
 	probingData       any           // a specific probe implementation saves a lastResult object here
-	Name              string        // probe name
-	CanStayBackground bool          `json:"-"` // flag that means the probing process can stay in background
 	runner            ProbeRunner   // probe runner func
 	finisher          ProbeFinisher // probe finisher func, only for probe that stays alive in background
-	// timings           map[string]time.Duration // timings data
-	logContext string // log prefix string
-	error      error  // last startup error
-	//	sync.Mutex
+	logContext        string        // log prefix string
+	error             error         // last startup error
 }
 
 type ProbeResult struct {
-	Name    string       `json:"name"`
-	Options ProbeOptions `json:"options"`
+	Name          string       `json:"name"`
+	Options       ProbeOptions `json:"options"`
+	Configuration any          `json:"configuration"`
 	Result
 	Data any `json:"data"`
 }
@@ -205,6 +205,7 @@ func (c *ProbeHandler) Result() (r ProbeResult) {
 	} else {
 		r.Result = c.curResult
 	}
+	r.Configuration = c.Config
 	c.Unlock()
 	return
 }
@@ -215,6 +216,7 @@ func (c *ProbeHandler) ResultFinished() (r ProbeResult) {
 	r.Options = c.ProbeOptions
 	r.Result = c.lastResult
 	r.Data = c.probingData
+	r.Configuration = c.Config
 	c.Unlock()
 	return
 }
