@@ -20,7 +20,7 @@ func (t *Task) Start(ctx context.Context) (succ bool, err error) {
 	if err = t.EStatusRun(); err != nil {
 		return
 	}
-	succ = t.Probe.Start(context.WithValue(ctx, "id", t.Name))
+	succ = t.Probe.Start(ContextWithLogger(ctx, NewChainLogger(GetLogger(ctx), t.Name)))
 	err = t.EStatusFinish(succ)
 	return
 }

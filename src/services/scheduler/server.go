@@ -8,12 +8,11 @@ import (
 	"github.com/go-co-op/gocron"
 	"log"
 	"net/http"
-	"os"
 	"sync"
 	"time"
 )
 
-var logger = log.New(os.Stdout, "", log.LstdFlags)
+var logger = model.DefaultLogger
 var defScheduler = Scheduler{
 	jobs:        make([]model.ScheduleJob, 0),
 	urlPatterns: make(map[string]httpHandler),
@@ -29,6 +28,7 @@ type Scheduler struct {
 	jobs        []model.ScheduleJob
 	urlPatterns map[string]httpHandler
 	sync.Mutex
+	logger model.Logger
 }
 
 type httpHandler func(req *http.Request) (code int, jsonData []byte)
@@ -38,6 +38,7 @@ func Run() (s *Scheduler) {
 	if s.Scheduler != nil {
 		return
 	}
+	s.logger = model.NewChainLogger(logger, "scheduler")
 	s.Scheduler = gocron.NewScheduler(time.Local)
 	s.Scheduler.TagsUnique()
 	s.Scheduler.SingletonModeAll()
@@ -46,7 +47,7 @@ func Run() (s *Scheduler) {
 	s.urlPatterns[httpPathPrefixJob] = s.httpJob
 	s.urlPatterns[httpPathPrefixJobs] = s.httpJobs
 
-	logger.Println("Scheduler is started")
+	s.logger.Println("started")
 	return
 }
 
@@ -116,10 +117,13 @@ func (s *Scheduler) addCronJob(name string, script *model.Script, schedule strin
 		sj = sj.LimitRunsTo(1)
 	}
 
+	l := s.logger
+
 	cronJob, err = sj.Name(name).DoWithJobDetails(func(s *model.Script, job gocron.Job) {
-		log.Printf("[%v] starting the job\n", job.GetName())
-		s.Run(job.Context())
-		log.Printf("[%v] job has been finished\n", job.GetName())
+		logger := model.NewChainLogger(l, job.GetName())
+		logger.Println("starting the job")
+		s.Run(model.ContextWithLogger(job.Context(), logger))
+		logger.Println("job has been finished")
 	}, script)
 
 	return

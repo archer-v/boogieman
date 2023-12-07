@@ -28,6 +28,7 @@ type Script struct {
 	Worker
 	anonymousCGroup   *CGroup
 	probesStayedAlive *goconcurrentqueue.FIFO
+	logger            Logger
 }
 
 type ScriptResult struct {
@@ -41,8 +42,9 @@ func (s *Script) Run(ctx context.Context) {
 	if s.probesStayedAlive == nil {
 		s.probesStayedAlive = goconcurrentqueue.NewFIFO()
 	}
+	s.logger = GetLogger(ctx)
 	if err := s.EStatusRun(); err != nil {
-		s.log(err.Error())
+		NewChainLogger(s.logger, "script").Println(err.Error())
 		return
 	}
 
@@ -67,7 +69,6 @@ func (s *Script) Run(ctx context.Context) {
 	for i, e := s.probesStayedAlive.Dequeue(); e == nil; i, e = s.probesStayedAlive.Dequeue() {
 		probe, ok := i.(Prober)
 		if !ok {
-			s.log("wrong queue object type")
 			continue
 		}
 		probe.Finish(ctx)
@@ -139,11 +140,9 @@ func (s *Script) newCGroup(name string) (c *CGroup) {
 
 func (s *Script) runCgroup(ctx context.Context, cgroup *CGroup) (succ bool) {
 	if err := cgroup.EStatusRun(); err != nil {
-		s.log("[cgroup][%v] %v", cgroup.Name, err.Error())
+		NewChainLogger(s.logger, "cgroup", cgroup.Name).Println(err.Error())
 		return
 	}
-
-	ctx = context.WithValue(ctx, "cgroup", cgroup.Name)
 
 	var wg sync.WaitGroup
 	for _, task := range cgroup.Tasks {
@@ -155,7 +154,7 @@ func (s *Script) runCgroup(ctx context.Context, cgroup *CGroup) (succ bool) {
 
 			_, err := task.Start(ctx)
 			if err != nil {
-				s.log("[task][%v] %v", task.Name, err.Error())
+				NewChainLogger(s.logger, "task", task.Name).Print(err.Error(), "\n")
 			}
 
 			if task.Probe.IsAlive() {
@@ -171,8 +170,4 @@ func (s *Script) runCgroup(ctx context.Context, cgroup *CGroup) (succ bool) {
 	}
 	_ = cgroup.EStatusFinish(succ)
 	return
-}
-
-func (s *Script) log(format string, args ...any) {
-	Logger.Printf("[runner]"+format+"\n", args...)
 }

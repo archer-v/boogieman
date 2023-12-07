@@ -22,7 +22,7 @@ func (s *Scheduler) httpJob(req *http.Request) (code int, jsonData []byte) {
 	jsonData, err = json.Marshal(j.Script.ResultFinished())
 	if err != nil {
 		code = http.StatusInternalServerError
-		logger.Printf("httpJob: can't create json response: %v\n", err)
+		s.logger.Printf("httpJob: can't create json response: %v\n", err)
 	}
 	return
 }
@@ -40,7 +40,7 @@ func (s *Scheduler) httpJobs(*http.Request) (code int, jsonData []byte) {
 	jsonData, err := json.Marshal(jobs)
 	if err != nil {
 		code = http.StatusInternalServerError
-		logger.Printf("httpJobs: can't create json response: %v\n", err)
+		s.logger.Printf("httpJobs: can't create json response: %v\n", err)
 	}
 	return
 }

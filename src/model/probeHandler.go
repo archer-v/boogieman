@@ -2,7 +2,6 @@ package model
 
 import (
 	"context"
-	"log"
 	"strings"
 )
 
@@ -19,6 +18,7 @@ type ProbeHandler struct {
 	finisher          ProbeFinisher // probe finisher func, only for probe that stays alive in background
 	logContext        string        // log prefix string
 	error             error         // last startup error
+	logger            Logger
 }
 
 // Start starts the probing and returns a probing curResult, don't call directly
@@ -33,17 +33,19 @@ func (c *ProbeHandler) Start(ctx context.Context) (succ bool) {
 
 	c.curResult.PrepareToStart()
 
-	var ctxID string
-	if ctx != nil && ctx.Value("id") != nil {
-		ctxID = ctx.Value("id").(string)
-	}
-	c.SetLogContext(ctxID)
+	//var ctxID string
+	//if ctx != nil && ctx.Value("id") != nil {
+	//		ctxID = ctx.Value("id").(string)
+	//}
+
+	c.logger = GetLogger(ctx)
+	//c.SetLogContext(ctxID)
 	c.logDebug("Starting the probe runner")
 
 	var probingData any
 	defer func() {
 		if err := recover(); err != nil {
-			log.Println(ctxID, "panic occurred:", err)
+			c.logger.Print("panic occurred:", err, "\n")
 			succ = false
 			_ = c.EStatusFinish(succ)
 		}
@@ -109,7 +111,7 @@ func (c *ProbeHandler) Log(format string, args ...any) {
 	if !strings.HasPrefix(format, "[") {
 		delim = " "
 	}
-	log.Printf(c.logContext+delim+format+"\n", args...)
+	c.logger.Printf(c.logContext+delim+format+"\n", args...)
 }
 
 func (c *ProbeHandler) logDebug(format string, args ...any) {

@@ -1,14 +1,13 @@
 package webserver
 
 import (
+	"boogieman/src/model"
 	"fmt"
-	"log"
 	"net/http"
-	"os"
 	"time"
 )
 
-var logger = log.New(os.Stdout, "", log.LstdFlags)
+var logger = model.DefaultLogger
 
 type Handlers []WebServed
 
@@ -20,8 +19,11 @@ type WebServed interface {
 func Run(bindTo string, handlers Handlers) (srv *http.Server, err error) {
 	srv = &http.Server{Addr: bindTo, ReadHeaderTimeout: time.Second}
 
+	logger := model.NewChainLogger(logger, "webserver")
+
 	for _, v := range handlers {
 		for _, h := range v.URLPatters() {
+			logger.Printf("add endpoint %v", h)
 			http.Handle(h, v)
 		}
 	}
@@ -42,7 +44,7 @@ func Run(bindTo string, handlers Handlers) (srv *http.Server, err error) {
 	if err != nil {
 		err = fmt.Errorf("can't start web server: %w", err)
 	} else {
-		logger.Printf("Webserver is listen on %v\n", bindTo)
+		logger.Printf("started and listen on %v\n", bindTo)
 	}
 	return
 }
