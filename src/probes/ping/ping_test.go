@@ -39,7 +39,8 @@ func Test_Runner(t *testing.T) {
 
 	for i, c := range cases {
 		p := New(options, c.config)
-		if p.Start(context.WithValue(ctx, "id", fmt.Sprintf("test %v", i+1))) != c.expectedResult {
+		ctx := model.ContextWithLogger(ctx, model.NewChainLogger(model.DefaultLogger, fmt.Sprintf("test %v", i+1)))
+		if p.Start(ctx) != c.expectedResult {
 			t.Errorf("Probe runner %v should return %v", i, c.expectedResult)
 		}
 	}

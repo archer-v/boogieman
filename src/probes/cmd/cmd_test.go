@@ -121,7 +121,8 @@ func Test_Runner(t *testing.T) {
 		} else {
 			ctx, cancelFunc = context.WithTimeout(context.Background(), c.ctxTimeout)
 		}
-		if p.Start(context.WithValue(ctx, "id", testId)) != c.expectedResult {
+		ctx = model.ContextWithLogger(ctx, model.NewChainLogger(model.DefaultLogger, testId))
+		if p.Start(ctx) != c.expectedResult {
 			t.Errorf("[%v] probe should return %v", testId, c.expectedResult)
 			if cancelFunc != nil {
 				cancelFunc()

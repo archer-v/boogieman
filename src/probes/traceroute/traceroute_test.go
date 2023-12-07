@@ -92,6 +92,7 @@ func Test_Runner(t *testing.T) {
 		} else {
 			ctx, cancelFunc = context.WithTimeout(context.Background(), c.ctxTimeout)
 		}
+		ctx = model.ContextWithLogger(ctx, model.NewChainLogger(model.DefaultLogger, fmt.Sprintf("test %v", i+1)))
 		rz := p.Start(context.WithValue(ctx, "id", caseName))
 		if cancelFunc != nil {
 			cancelFunc()
