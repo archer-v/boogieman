@@ -53,8 +53,11 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 		wg.Add(1)
 		go func(s string) {
 			t := time.Now()
-			var dur time.Duration
-			var err error
+			var (
+				dur time.Duration
+				err error
+				r   *http.Response
+			)
 			defer func() {
 				dur = time.Since(t)
 				if err != nil {
@@ -69,11 +72,14 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 					}
 					c.Log("[%v] OK, %vms", s, dur.Milliseconds())
 				}
+				if r != nil {
+					_ = r.Body.Close()
+				}
 				wg.Done()
 			}()
 
 			client := http.Client{Timeout: c.Timeout}
-			r, err := client.Get(s)
+			r, err = client.Get(s)
 			if err != nil {
 				if strings.Contains(err.Error(), "context deadline exceeded") {
 					err = ErrTimeout
@@ -90,6 +96,6 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 	}
 	wg.Wait()
 	succ = done == len(c.Urls)
-	resultObject = &timings
+	resultObject = timings.TimingsMs()
 	return
 }
