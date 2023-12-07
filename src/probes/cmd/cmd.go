@@ -126,6 +126,7 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 		err = fmt.Errorf("wrong exit code %v", finished.Exit)
 	}
 	succ = finished.Exit == c.ExitCode == c.Expect
+	resultObject = finished.Exit
 	return
 }
 
