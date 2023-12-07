@@ -101,6 +101,6 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 	}
 	wg.Wait()
 	succ = done == len(c.Hosts)
-	resultObject = &timings
+	resultObject = timings.TimingsMs()
 	return
 }
