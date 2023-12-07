@@ -98,7 +98,7 @@ func (s *Scheduler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (s *Scheduler) UrlPatters() (p []string) {
+func (s *Scheduler) URLPatters() (p []string) {
 	for key := range s.urlPatterns {
 		p = append(p, key)
 	}
