@@ -22,4 +22,4 @@ jobs:
     timeout: 1000
     vars:
       gateway-alive-cmd-ping:
-        cmd: ping -c 3 -i 0.1 192.168.168.168
+        cmd: ping -c 3 -i 0.1 -W 0.1 192.168.168.168

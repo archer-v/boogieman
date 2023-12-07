@@ -5,4 +5,4 @@ script:
       options:
         timeout: 500
       configuration:
-        cmd: ping -c 3 -i 0.1 127.0.0.1
+        cmd: ping -c 3 -i 0.1 -W 0.1 127.0.0.1
