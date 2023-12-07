@@ -51,9 +51,9 @@ func main() {
 	finisher.Add(schedulerService, finish.WithName("scheduler"))
 
 	// prometheus
-	promCollector := prometheus.Run(true, true)
+	prometheusService := prometheus.Run(true, true, schedulerService)
 
-	webService, err := webserver.Run(config.BindTo, []webserver.WebServed{schedulerService, promCollector})
+	webService, err := webserver.Run(config.BindTo, []webserver.WebServed{schedulerService, prometheusService})
 	if err != nil {
 		fmt.Print(err.Error())
 		os.Exit(ExitErrConfig)

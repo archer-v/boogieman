@@ -7,13 +7,13 @@ import (
 	"net/http"
 )
 
-type Collector struct {
+type Prometheus struct {
 	reg     *prometheus.Registry
 	handler http.Handler
 }
 
-func Run(processMetrics bool, goMetrics bool) (s *Collector) {
-	s = &Collector{}
+func Run(processMetrics bool, goMetrics bool, collector prometheus.Collector) (s *Prometheus) {
+	s = &Prometheus{}
 	s.reg = prometheus.NewPedanticRegistry()
 
 	if processMetrics {
@@ -22,13 +22,21 @@ func Run(processMetrics bool, goMetrics bool) (s *Collector) {
 	if goMetrics {
 		s.reg.MustRegister(collectors.NewGoCollector())
 	}
+
+	if collector != nil {
+		s.reg.MustRegister(collector)
+	}
+
 	s.handler = promhttp.HandlerFor(s.reg, promhttp.HandlerOpts{})
 	return
 }
-func (s *Collector) ServeHTTP(res http.ResponseWriter, req *http.Request) {
+
+// ServeHTTP implements WebServed interface
+func (s *Prometheus) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	s.handler.ServeHTTP(res, req)
 }
 
-func (s *Collector) UrlPatters() (p []string) {
+// URLPatters implements WebServed interface
+func (s *Prometheus) URLPatters() (p []string) {
 	return []string{"/metrics"}
 }
