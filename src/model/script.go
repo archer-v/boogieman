@@ -109,7 +109,11 @@ func (s *Script) Result() (r ScriptResult) {
 
 func (s *Script) ResultFinished() (r ScriptResult) {
 	r.Result = s.Worker.ResultFinished()
-	r.Status = string(EStatusFinished)
+	if r.Result.Completed() {
+		r.Status = string(EStatusFinished)
+	} else {
+		r.Status = string(EStatusNew)
+	}
 	r.Tasks = make([]TaskResult, len(s.Tasks))
 	for i, t := range s.Tasks {
 		r.Tasks[i] = t.ResultFinished()

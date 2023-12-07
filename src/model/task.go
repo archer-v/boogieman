@@ -37,7 +37,11 @@ func (t *Task) Result() (tr TaskResult) {
 func (t *Task) ResultFinished() (tr TaskResult) {
 	tr.Name = t.Name
 	tr.Result = t.Worker.ResultFinished()
-	tr.Status = string(EStatusFinished)
+	if tr.Result.Completed() {
+		tr.Status = string(EStatusFinished)
+	} else {
+		tr.Status = string(EStatusNew)
+	}
 	tr.Probe = t.Probe.ResultFinished()
 	return
 }
