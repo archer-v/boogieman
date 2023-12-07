@@ -28,3 +28,11 @@ func (c *Timings) MarshalJSON() ([]byte, error) {
 	}
 	return json.Marshal(tm)
 }
+
+func (c *Timings) TimingsMs() map[string]int {
+	tm := map[string]int{}
+	for k, v := range c.Timings {
+		tm[k] = int(v.Milliseconds())
+	}
+	return tm
+}
