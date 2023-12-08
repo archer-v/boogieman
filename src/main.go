@@ -2,6 +2,7 @@ package main
 
 import (
 	"boogieman/src/configuration"
+	"boogieman/src/model"
 	"boogieman/src/services/prometheus"
 	"boogieman/src/services/scheduler"
 	"boogieman/src/services/webserver"
@@ -9,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/pseidemann/finish"
+	"io"
 	"log"
 	"os"
 	"time"
@@ -30,14 +32,21 @@ var finisher = &finish.Finisher{Timeout: ShutdownWaitingTimeout}
 
 func main() {
 	if buildTimestamp == "" {
-		version = "version: DEV"
+		version = "DEV"
 	} else {
-		version = fmt.Sprintf("version: %v-%v-%v, build: %v", gitTag, gitBranch, gitCommit, buildTimestamp)
+		version = fmt.Sprintf("%v-%v-%v, build: %v", gitTag, gitBranch, gitCommit, buildTimestamp)
 	}
+
+	configuration.AppVersion = version
+	configuration.AppDescriptionMessage = "version: " + version
 
 	config, err := configuration.StartupConfiguration()
 	if err != nil {
-		fmt.Print(err.Error())
+		fmt.Printf("Wrong startup configuration: %v\n", err)
+		os.Exit(ExitErrConfig)
+	}
+
+	if config.Mode == configuration.StartupModeWrong {
 		os.Exit(ExitErrConfig)
 	}
 
@@ -55,7 +64,7 @@ func main() {
 
 	webService, err := webserver.Run(config.BindTo, []webserver.WebServed{schedulerService, prometheusService})
 	if err != nil {
-		fmt.Print(err.Error())
+		fmt.Println(err.Error())
 		os.Exit(ExitErrConfig)
 	}
 	finisher.Add(webService, finish.WithName("web server"))
@@ -63,7 +72,7 @@ func main() {
 	for _, j := range config.ScheduleJobs {
 		err = schedulerService.AddJob(j)
 		if err != nil {
-			log.Printf("[%v] error with creating a scheduling job: %v", j.Name, err)
+			log.Printf("[%v] error with creating a scheduling job: %v\n", j.Name, err)
 		}
 	}
 	finisher.Wait()
@@ -72,19 +81,21 @@ func main() {
 
 func runScriptAndExit(config configuration.StartupConfig) {
 	ctx := context.Background()
+	config.JSON = config.JSON || config.PrettyJSON
+	if config.JSON {
+		// fake logger in order to suppress all log output
+		model.DefaultLogger = log.New(io.Discard, "", 0)
+	}
 	config.Script.Run(ctx)
 	if config.JSON {
 		var d []byte
-		if config.OutputPretty {
-			d, _ = json.MarshalIndent(config.Script, "", "    ")
+		if config.PrettyJSON {
+			d, _ = json.MarshalIndent(config.Script.Result(), "", "    ")
 		} else {
-			d, _ = json.Marshal(config.Script)
+			d, _ = json.Marshal(config.Script.Result())
 		}
 		fmt.Println(string(d))
 	}
-
-	d, _ := json.MarshalIndent(config.Script.Result(), "", "    ")
-	fmt.Println(string(d))
 
 	if config.Script.Result().Success {
 		os.Exit(ExitOk)

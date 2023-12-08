@@ -2,7 +2,7 @@ package configuration
 
 import (
 	"boogieman/src/model"
-	"boogieman/src/probeFactory"
+	"boogieman/src/probefactory"
 	_ "boogieman/src/probes"
 	"errors"
 	"fmt"
@@ -12,46 +12,63 @@ import (
 	"time"
 )
 
-var envPrefix = "PROBE"
+var envPrefix = "BOOGIEMAN"
+var AppDescriptionMessage = ""
+var AppVersion = ""
+
+type StartupMode int
+
+const (
+	StartupModeWrong  StartupMode = iota
+	StartupModeOneRun StartupMode = iota
+	StartupModeDaemon StartupMode = iota
+)
 
 type startupOptions struct {
-	Script              string         `envconfig:"optional"`
-	ProbeName           string         `envconfig:"optional"`
-	ProbeConf           string         `envconfig:"optional"`
-	ProbeOptionsTimeout *time.Duration `envconfig:"optional"`
-	ProbeOptionsExpect  *bool          `envconfig:"optional"`
-	Config              string         `envconfig:"optional"`
+	Script              string
+	Probe               string
+	ProbeConf           string
+	ProbeOptionsTimeout time.Duration
+	ProbeOptionsExpect  bool `envconfig:"default=true"`
+	Debug               bool
+	VerboseLog          bool
+	Config              string
 }
 
 type StartupConfig struct {
-	OneRun       bool
+	Mode         StartupMode
 	JSON         bool
-	OutputPretty bool
+	PrettyJSON   bool
 	BindTo       string
 	Script       *model.Script
 	ScheduleJobs []model.ScheduleJob
 }
 
+//nolint:funlen
 func StartupConfiguration() (config StartupConfig, err error) {
-
 	var o startupOptions
-	// parse environment variables to the DaemonConfig struct
-	if err := envconfig.InitWithPrefix(&o, envPrefix); err != nil {
-		panic(err)
+
+	// parse environment variables
+	if err := envconfig.InitWithOptions(&o, envconfig.Options{LeaveNil: true, AllOptional: true, Prefix: envPrefix}); err != nil {
+		fmt.Printf("something got wrong with parsing env variables: %v", err)
 	}
 
+	flaggy.SetDescription(AppDescriptionMessage)
+	flaggy.SetVersion(AppVersion)
 	flaggy.DefaultParser.ShowHelpOnUnexpected = true
 
 	oneRun := flaggy.NewSubcommand("oneRun")
 	oneRun.Description = "performs a single run, print result and exit"
 
 	oneRun.String(&o.Script, "s", "script", "path to a script file in yml format")
-	oneRun.String(&o.ProbeName, "n", "probename", "probe name to start (ignored if script option is selected)")
-	oneRun.String(&o.ProbeConf, "o", "probeconf", "probe configuration (ignored if script option is selected)")
-	oneRun.Duration(o.ProbeOptionsTimeout, "t", "timeout", "probe waiting timeout (ignored if script option is selected)")
-	oneRun.Bool(o.ProbeOptionsExpect, "e", "expect", "expected result true|false (ignored if script option is selected)")
+	oneRun.String(&o.Probe, "p", "probe", "single probe to start (ignored if script option is selected)")
+	oneRun.String(&o.ProbeConf, "c", "config", "probe configuration string (ignored if script option is selected)")
+	oneRun.Duration(&o.ProbeOptionsTimeout, "t", "timeout", "probe waiting timeout (ignored if script option is selected)")
+	oneRun.Bool(&o.Debug, "d", "debug", "debug logging")
+	oneRun.Bool(&o.VerboseLog, "v", "verbose", "verbose logging")
+	oneRun.Bool(&o.ProbeOptionsExpect, "e", "expect", "expected result true|false (ignored if script option is selected)")
 	oneRun.Bool(&config.JSON, "j", "json", "output result in JSON format")
-	oneRun.Bool(&config.OutputPretty, "J", "pretty", "pretty output with indent and CR")
+	oneRun.Bool(&config.PrettyJSON, "J", "jsonp", "output result in JSON format with indents and CR")
 
 	daemon := flaggy.NewSubcommand("daemon")
 	daemon.Description = "start in daemon mode and performs scheduled jobs"
@@ -60,26 +77,33 @@ func StartupConfiguration() (config StartupConfig, err error) {
 	flaggy.AttachSubcommand(oneRun, 1)
 	flaggy.AttachSubcommand(daemon, 1)
 
+	defer func() {
+		if e := recover(); e != nil {
+			err = fmt.Errorf("%v", e)
+		}
+	}()
+
 	flaggy.Parse()
 
-	if oneRun.Used {
-		config.OneRun = true
-		if (o.Script == "" && o.ProbeName == "") || (o.Script != "" && o.ProbeName != "") {
-			err = errors.New("either 'script' or 'probename' option should be defined")
-			flaggy.ShowHelp(err.Error())
+	switch {
+	case oneRun.Used:
+		config.Mode = StartupModeOneRun
+		if (o.Script == "" && o.Probe == "") || (o.Script != "" && o.Probe != "") {
+			err = errors.New("either 'script' or 'probe' option should be defined")
+			flaggy.ShowHelp("")
 			return
 		}
-
-		if o.ProbeName != "" {
+		if o.Probe != "" {
 			var p model.Prober
 			d := model.DefaultProbeOptions
-			if o.ProbeOptionsExpect != nil {
-				d.Expect = *o.ProbeOptionsExpect
+			d.Expect = o.ProbeOptionsExpect
+			d.Debug = o.Debug
+			d.VerboseLogging = o.VerboseLog
+
+			if o.ProbeOptionsTimeout != 0 {
+				d.Timeout = o.ProbeOptionsTimeout
 			}
-			if o.ProbeOptionsTimeout != nil {
-				d.Timeout = *o.ProbeOptionsTimeout
-			}
-			p, err = probeFactory.NewProbe(o.ProbeName, d, o.ProbeConf)
+			p, err = probefactory.NewProbe(o.Probe, d, o.ProbeConf)
 			if err != nil {
 				return
 			}
@@ -89,7 +113,6 @@ func StartupConfiguration() (config StartupConfig, err error) {
 				Probe: p,
 			})
 		}
-
 		if o.Script != "" {
 			var data []byte
 			data, err = os.ReadFile(o.Script)
@@ -103,9 +126,8 @@ func StartupConfiguration() (config StartupConfig, err error) {
 			}
 		}
 		return
-	}
-
-	if daemon.Used {
+	case daemon.Used:
+		config.Mode = StartupModeDaemon
 		if o.Config == "" {
 			err = errors.New("configuration file should be defined in a daemon mode")
 			flaggy.ShowHelp(err.Error())
@@ -116,7 +138,6 @@ func StartupConfiguration() (config StartupConfig, err error) {
 		if err != nil {
 			return
 		}
-
 		daemonConfig, e := DaemonYMLConfiguration(data)
 		if e != nil {
 			err = fmt.Errorf("can't parse configuration from file: %w", e)
@@ -124,6 +145,9 @@ func StartupConfiguration() (config StartupConfig, err error) {
 		}
 		config.BindTo = daemonConfig.Global.BindTo
 		config.ScheduleJobs = daemonConfig.Jobs
+	default:
+		flaggy.ShowHelp("")
+		return
 	}
 	return
 }
