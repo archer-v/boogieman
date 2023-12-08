@@ -2,12 +2,11 @@ package traceroute
 
 import (
 	"boogieman/src/model"
-	"boogieman/src/probeFactory"
+	"boogieman/src/probefactory"
 	"context"
 	"errors"
 	"github.com/archer-v/gotraceroute"
 	"github.com/creasty/defaults"
-	"log"
 	"strings"
 	"time"
 )
@@ -34,7 +33,7 @@ var name = "traceroute"
 var ErrTimeout = errors.New("timeout")
 
 func init() {
-	probeFactory.RegisterProbe(constructor{probeFactory.BaseConstructor{Name: name}})
+	probefactory.RegisterProbe(constructor{probefactory.BaseConstructor{Name: name}})
 }
 
 func New(options model.ProbeOptions, config Config) *Probe {
@@ -98,8 +97,8 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 			if !traceInProgress {
 				break
 			}
-			if c.LogDump {
-				log.Print(hop.StringHuman())
+			if c.LogDump || c.VerboseLogging {
+				c.Log(hop.StringHuman())
 			}
 			for _, exp := range c.ExpectedHops {
 				if strings.Contains(hop.Node.String(), exp) {

@@ -2,7 +2,7 @@ package traceroute
 
 import (
 	"boogieman/src/model"
-	"boogieman/src/probeFactory"
+	"boogieman/src/probefactory"
 	"context"
 	"fmt"
 	"testing"
@@ -12,7 +12,7 @@ import (
 func Test_Runner(t *testing.T) {
 	defOptions := model.ProbeOptions{Timeout: time.Millisecond * 5000, Expect: true}
 	constructor := constructor{
-		probeFactory.BaseConstructor{
+		probefactory.BaseConstructor{
 			Name: name,
 		},
 	}
@@ -93,7 +93,7 @@ func Test_Runner(t *testing.T) {
 			ctx, cancelFunc = context.WithTimeout(context.Background(), c.ctxTimeout)
 		}
 		ctx = model.ContextWithLogger(ctx, model.NewChainLogger(model.DefaultLogger, fmt.Sprintf("test %v", i+1)))
-		rz := p.Start(context.WithValue(ctx, "id", caseName))
+		rz := p.Start(ctx)
 		if cancelFunc != nil {
 			cancelFunc()
 		}
