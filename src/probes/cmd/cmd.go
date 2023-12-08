@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"boogieman/src/model"
-	"boogieman/src/probeFactory"
+	"boogieman/src/probefactory"
 	"context"
 	"errors"
 	"fmt"
@@ -22,7 +22,7 @@ var ErrTimeout = errors.New("timeout")
 var ErrUnexpectedExit = errors.New("cmd exited unexpectedly")
 
 func init() {
-	probeFactory.RegisterProbe(constructor{probeFactory.BaseConstructor{Name: name}})
+	probefactory.RegisterProbe(constructor{probefactory.BaseConstructor{Name: name}})
 }
 
 func New(options model.ProbeOptions, config Config) *Probe {

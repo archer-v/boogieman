@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"boogieman/src/model"
-	"boogieman/src/probeFactory"
+	"boogieman/src/probefactory"
 	"context"
 	"fmt"
 	"log"
@@ -97,7 +97,7 @@ func Test_Runner(t *testing.T) {
 	}
 
 	constructor := constructor{
-		probeFactory.BaseConstructor{
+		probefactory.BaseConstructor{
 			Name: name,
 		},
 	}
