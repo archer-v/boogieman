@@ -2,7 +2,7 @@ package configuration
 
 import (
 	"boogieman/src/model"
-	"boogieman/src/probeFactory"
+	"boogieman/src/probefactory"
 	"encoding/json"
 	"fmt"
 	"github.com/creasty/defaults"
@@ -48,7 +48,7 @@ func ScriptYMLConfiguration(data []byte, overrideConfigOptions ...map[string]map
 	for _, t := range parsed.Script {
 		var config any
 		// get the probe configuration struct
-		config, err = probeFactory.NewProbeConfiguration(t.Probe.Name)
+		config, err = probefactory.NewProbeConfiguration(t.Probe.Name)
 		if err != nil {
 			err = fmt.Errorf("[%v] %w", t.Name, err)
 			return
@@ -71,7 +71,7 @@ func ScriptYMLConfiguration(data []byte, overrideConfigOptions ...map[string]map
 			}
 		}
 
-		p, err = probeFactory.NewProbe(t.Probe.Name, t.Probe.Options, config)
+		p, err = probefactory.NewProbe(t.Probe.Name, t.Probe.Options, config)
 		if err != nil {
 			err = fmt.Errorf("[%v] %w", t.Name, err)
 			return
