@@ -1,8 +1,8 @@
-package openvpnConnect
+package openvpn
 
 import (
 	"boogieman/src/model"
-	"boogieman/src/probeFactory"
+	"boogieman/src/probefactory"
 	"boogieman/src/util"
 	"context"
 	"errors"
@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-var OpenvpnBinaryPath = "openvpn"
+var BinaryPath = "openvpn"
 
 type Probe struct {
 	model.ProbeHandler
@@ -29,7 +29,7 @@ type Config struct {
 	ConfigData string // openvpn client configuration
 }
 
-var name = "openvpnConnect"
+var name = "openvpn"
 
 var (
 	ErrTimeout     = errors.New("timeout")
@@ -37,7 +37,7 @@ var (
 )
 
 func init() {
-	probeFactory.RegisterProbe(constructor{probeFactory.BaseConstructor{Name: name}})
+	probefactory.RegisterProbe(constructor{probefactory.BaseConstructor{Name: name}})
 }
 
 func New(options model.ProbeOptions, config Config) *Probe {
@@ -77,14 +77,14 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 		configFileName = c.ConfigFile
 		configData, e := os.ReadFile(configFileName)
 		if e != nil {
-			err = fmt.Errorf("can't read openvpn config: %v", e)
+			err = fmt.Errorf("can't read openvpn config: %w", e)
 			return
 		}
 		host = hostFromConfigData(string(configData))
 	} else {
 		configFileName, err = util.StringToFile(c.ConfigData)
 		if err != nil {
-			err = fmt.Errorf("can't create temporary file with openvpn config: %v", err)
+			err = fmt.Errorf("can't create temporary file with openvpn config: %w", err)
 			return
 		}
 		defer func() {
@@ -129,7 +129,7 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 	return
 }
 
-func (c *Probe) Finisher(ctx context.Context) {
+func (c *Probe) Finisher(context.Context) {
 	if c.cmd != nil {
 		err := c.cmd.Stop()
 		if err != nil {
@@ -146,7 +146,7 @@ func (c *Probe) IsAlive() bool {
 // openvpnStart starts openvpn process and wait until connection established or error | timeout happened,
 // returns cmd.Cmd describing running openvpn instance or error
 func openvpnStart(ctx context.Context, configPath string, initTimeout time.Duration, logout bool) (cmdRunner *cmd.Cmd, err error) {
-	cmdRunner = cmd.NewCmdOptions(cmd.Options{Buffered: true, Streaming: true}, OpenvpnBinaryPath, "--config", configPath)
+	cmdRunner = cmd.NewCmdOptions(cmd.Options{Buffered: true, Streaming: true}, BinaryPath, "--config", configPath)
 
 	status := cmdRunner.Start()
 

@@ -13,12 +13,12 @@ script:
   - name: vpn-connect
     cgroup: 2
     probe:
-      name: openvpnConnect
+      name: openvpn
       options:
         timeout: 5000
         stayAlive: true
       configuration:
-        configFile: src/probes/openvpnConnect/test/openvpn-client.ovpn
+        configFile: src/probes/openvpn/test/openvpn-client.ovpn
   - name: vpn-tunnel-alive
     cgroup: 3
     probe:
