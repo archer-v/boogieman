@@ -2,7 +2,7 @@ package web
 
 import (
 	"boogieman/src/model"
-	"boogieman/src/probeFactory"
+	"boogieman/src/probefactory"
 	"context"
 	"errors"
 	"fmt"
@@ -25,9 +25,10 @@ type Config struct {
 
 var name = "web"
 var ErrTimeout = errors.New("timeout")
+var DefaultHttpScheme = "https"
 
 func init() {
-	probeFactory.RegisterProbe(constructor{probeFactory.BaseConstructor{Name: name}})
+	probefactory.RegisterProbe(constructor{probefactory.BaseConstructor{Name: name}})
 }
 
 func New(options model.ProbeOptions, config Config) *Probe {
@@ -45,9 +46,13 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 	var wg sync.WaitGroup
 	done := 0
 	for _, s := range c.Urls {
-		if _, e := url.Parse(s); e != nil {
+		if u, e := url.Parse(s); e != nil {
 			c.Log("wrong url %v", s)
 			return false, nil
+		} else {
+			if u.Scheme == "" {
+				s = DefaultHttpScheme + "://" + s
+			}
 		}
 
 		wg.Add(1)
@@ -84,7 +89,7 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 				if strings.Contains(err.Error(), "context deadline exceeded") {
 					err = ErrTimeout
 				} else {
-					err = fmt.Errorf("http error %v", err)
+					err = fmt.Errorf("http error %w", err)
 				}
 				return
 			}
