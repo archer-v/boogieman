@@ -2,7 +2,7 @@ package ping
 
 import (
 	"boogieman/src/model"
-	"boogieman/src/probeFactory"
+	"boogieman/src/probefactory"
 	"context"
 	"errors"
 	"fmt"
@@ -18,7 +18,8 @@ type Probe struct {
 }
 
 type Config struct {
-	Hosts []string
+	Interval int `default:"500"`
+	Hosts    []string
 }
 
 var name = "ping"
@@ -26,7 +27,7 @@ var name = "ping"
 var ErrTimeout = errors.New("timeout")
 
 func init() {
-	probeFactory.RegisterProbe(constructor{probeFactory.BaseConstructor{Name: name}})
+	probefactory.RegisterProbe(constructor{probefactory.BaseConstructor{Name: name}})
 }
 
 func New(options model.ProbeOptions, config Config) *Probe {
@@ -51,6 +52,10 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 			var err error
 			defer func() {
 				dur = time.Since(t)
+				if e := recover(); e != nil {
+					err = fmt.Errorf("panic occurred: %v", e)
+				}
+
 				if err != nil {
 					c.Log("[%v] %v, %vms", s, err, dur.Milliseconds())
 					if errors.Is(ErrTimeout, err) && !c.Expect {
@@ -68,15 +73,11 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 
 			p, err := probing.NewPinger(s)
 			if err != nil {
-				//c.Log(err.Error())
-				//if strings.Contains(err.Error(), "no such host") {
-				//	err = errors.New("no such host")
-				//}
 				return
 			}
 			p.Count = 3
 			p.Timeout = c.Timeout
-			p.Interval = 500 * time.Millisecond
+			p.Interval = time.Duration(c.Interval) * time.Millisecond
 			p.SetPrivileged(true)
 
 			p.OnRecv = func(pkt *probing.Packet) {
@@ -88,7 +89,8 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 
 			if err != nil {
 				if strings.Contains(err.Error(), "not permitted") {
-					err = fmt.Errorf("error %v, see https://github.com/prometheus-community/pro-bing#supported-operating-systems", err)
+					// see https://github.com/prometheus-community/pro-bing#supported-operating-systems
+					err = fmt.Errorf("error %w, root privileges is required or SET_CAP_RAW flag", err)
 				}
 				return
 			}
