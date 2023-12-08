@@ -17,6 +17,7 @@ type ProbeOptions struct {
 	StayBackground bool          `json:"stayBackground,omitempty"` // a probe runner should stay alive after check is finished
 	Expect         bool          `json:"expect" default:"true"`
 	Debug          bool          `json:"debug,omitempty" default:"false"`
+	VerboseLogging bool          `json:"-" default:"false"`
 }
 
 func (s *ProbeOptions) UnmarshalJSON(b []byte) (err error) {
