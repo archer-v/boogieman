@@ -1,4 +1,4 @@
-package openvpnConnect
+package openvpn
 
 import (
 	"boogieman/src/model"
