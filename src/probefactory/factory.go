@@ -1,4 +1,4 @@
-package probeFactory
+package probefactory
 
 import (
 	"boogieman/src/model"
@@ -39,7 +39,7 @@ func RegisterProbe(c Constructor) {
 func probeConstructorByName(name string) (Constructor, error) {
 	c, ok := probes[name]
 	if !ok {
-		return nil, errors.New("Unknown probe with name '" + name + "'")
+		return nil, errors.New("unknown probe '" + name + "'")
 	}
 	return c, nil
 }

@@ -1,4 +1,4 @@
-package probeFactory
+package probefactory
 
 import (
 	"boogieman/src/model"
