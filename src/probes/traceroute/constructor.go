@@ -2,16 +2,15 @@ package traceroute
 
 import (
 	"boogieman/src/model"
-	"boogieman/src/probeFactory"
+	"boogieman/src/probefactory"
 	"regexp"
 )
 
 type constructor struct {
-	probeFactory.BaseConstructor
+	probefactory.BaseConstructor
 }
 
 func (c constructor) NewProbe(options model.ProbeOptions, configuration any) (p model.Prober, err error) {
-
 	var config Config
 	if config, err = c.configuration(configuration); err != nil {
 		return
@@ -33,7 +32,6 @@ func (c constructor) NewProbeConfiguration() any {
 
 // configuration casts configuration of any type to Config struct
 func (c constructor) configuration(conf any) (config Config, err error) {
-
 	if conf == nil {
 		err = model.ErrorConfig
 		return

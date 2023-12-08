@@ -2,12 +2,12 @@ package web
 
 import (
 	"boogieman/src/model"
-	"boogieman/src/probeFactory"
+	"boogieman/src/probefactory"
 	"regexp"
 )
 
 type constructor struct {
-	probeFactory.BaseConstructor
+	probefactory.BaseConstructor
 }
 
 func (c constructor) NewProbe(options model.ProbeOptions, configuration any) (p model.Prober, err error) {
@@ -27,7 +27,6 @@ func (c constructor) NewProbeConfiguration() any {
 
 // configuration casts configuration of any type to Config struct
 func (c constructor) configuration(conf any) (configuration Config, err error) {
-
 	if conf == nil {
 		err = model.ErrorConfig
 		return
@@ -39,7 +38,9 @@ func (c constructor) configuration(conf any) (configuration Config, err error) {
 
 	if str, ok := conf.(string); ok {
 		urls := regexp.MustCompile("\\s*,\\s*").Split(str, -1)
-		return Config{Urls: urls}, nil
+		newConfig := c.NewProbeConfiguration().(*Config)
+		newConfig.Urls = urls
+		return *newConfig, nil
 	}
 
 	err = model.ErrorConfig

@@ -2,13 +2,13 @@ package openvpnConnect
 
 import (
 	"boogieman/src/model"
-	"boogieman/src/probeFactory"
+	"boogieman/src/probefactory"
 	"fmt"
 	"os"
 )
 
 type constructor struct {
-	probeFactory.BaseConstructor
+	probefactory.BaseConstructor
 }
 
 func (c constructor) NewProbe(options model.ProbeOptions, configuration any) (p model.Prober, err error) {

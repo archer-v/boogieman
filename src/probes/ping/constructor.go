@@ -2,12 +2,12 @@ package ping
 
 import (
 	"boogieman/src/model"
-	"boogieman/src/probeFactory"
+	"boogieman/src/probefactory"
 	"regexp"
 )
 
 type constructor struct {
-	probeFactory.BaseConstructor
+	probefactory.BaseConstructor
 }
 
 func (c constructor) NewProbe(options model.ProbeOptions, configuration any) (p model.Prober, err error) {
@@ -25,7 +25,7 @@ func (c constructor) NewProbe(options model.ProbeOptions, configuration any) (p 
 }
 
 func (c constructor) NewProbeConfiguration() any {
-	return &Config{}
+	return c.SetConfigDefaults(&Config{})
 }
 
 // configuration casts configuration of any type to Config struct
@@ -42,7 +42,9 @@ func (c constructor) configuration(conf any) (configuration Config, err error) {
 
 	if str, ok := conf.(string); ok {
 		hosts := regexp.MustCompile("\\s*,\\s*").Split(str, -1)
-		return Config{hosts}, nil
+		newConfig := c.NewProbeConfiguration().(*Config)
+		newConfig.Hosts = hosts
+		return *newConfig, nil
 	}
 
 	err = model.ErrorConfig
