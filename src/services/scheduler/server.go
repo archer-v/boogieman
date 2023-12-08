@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/go-co-op/gocron"
-	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -60,7 +59,7 @@ func (s *Scheduler) Shutdown(ctx context.Context) error {
 	select {
 	case <-done:
 	case <-ctx.Done():
-		log.Println("Scheduler finishing timeout")
+		s.logger.Println("Scheduler finishing timeout")
 	}
 	return nil
 }
@@ -75,6 +74,7 @@ func (s *Scheduler) AddJob(j model.ScheduleJob) (err error) {
 	}
 	j.CronJob = job
 	s.addJob(j)
+	s.logger.Println("add job ", j.Name, " with scenario from ", j.ScriptFile, " at a schedule ", j.Schedule)
 	return
 }
 
