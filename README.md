@@ -285,3 +285,7 @@ boogieman_task_runtime{job="TestJob2",script="test/script-simple.yml",task="gate
 boogieman_task_runtime{job="TestJob2",script="test/script-simple.yml",task="internet-alive"} 1237
 boogieman_task_runtime{job="TestJob3",script="test/script-cmd.yml",task="gateway-alive-cmd-ping"} 313
 ```
+
+### Note
+
+RAW_SOCKETS are used to perform ping and traceroute checks. So, the command requires root privileges to perform this checks. You can user sudo, or you can grant permissions only for operation with a raw sockets by setting the SET_CAP_RAW flag on the executable file. Use setcap command: `setcap cap_net_raw+ep ./boogieman`
