@@ -1,6 +1,5 @@
 # boogieman
-The probing utility (and golang library) for monitoring availability of host nodes, networks, services and processes.
-It's intended as a lightweight simple utility used in automation scripts or metrics provider in different DevOPS and NOC operations. All probes expose their data as Prometheus metrics and this utility can be used as source of availability metrics of hosts, networks, routes and network services.
+The probing utility, is designed to monitor the availability of host nodes, networks, services, and processes. It serves as a lightweight and straightforward tool, ideal for integration into automation scripts or as a metrics provider in various DevOps and NOC operations. All probes within this utility expose their data as Prometheus metrics or a JSON formatted object exposed at a http port, making it a reliable source for availability metrics related to hosts, networks, routes, and network services.
 
 The utility can perform single or composite checks combined in a scenario described in configuration file in a YAML format
 
@@ -9,7 +8,7 @@ The utility can perform single or composite checks combined in a scenario descri
 - web (GET request with response code checking) 
 - openvpn
 - cmd (arbitrary console command with exit code checking)
-- traceroute (with checking of a particular host in a traceroute)
+- traceroute (with checking of presense of a particular host in a traceroute)
 - any additional probes can be created
 
 All probes can returns additional data, like timings, response codes, stdout, etc
