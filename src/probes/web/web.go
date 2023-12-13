@@ -19,7 +19,7 @@ type Probe struct {
 }
 
 type Config struct {
-	HttpStatus int `default:"200"`
+	HTTPStatus int `default:"200"`
 	Urls       []string
 }
 
@@ -41,6 +41,7 @@ func New(options model.ProbeOptions, config Config) *Probe {
 	return &p
 }
 
+//nolint:funlen
 func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 	var timings model.Timings
 	var wg sync.WaitGroup
@@ -49,10 +50,8 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 		if u, e := url.Parse(s); e != nil {
 			c.Log("wrong url %v", s)
 			return false, nil
-		} else {
-			if u.Scheme == "" {
-				s = DefaultHttpScheme + "://" + s
-			}
+		} else if u.Scheme == "" {
+			s = DefaultHttpScheme + "://" + s
 		}
 
 		wg.Add(1)
@@ -93,7 +92,7 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 				}
 				return
 			}
-			if r.StatusCode != c.HttpStatus {
+			if r.StatusCode != c.HTTPStatus {
 				err = fmt.Errorf("wrong response %v", r.StatusCode)
 				return
 			}

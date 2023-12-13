@@ -21,23 +21,23 @@ func Test_Runner(t *testing.T) {
 
 	cases := []testCase{
 		{
-			Config{Urls: []string{"https://google.com/", "https://google.com/robots.txt"}, HttpStatus: http.StatusOK},
+			Config{Urls: []string{"https://google.com/", "https://google.com/robots.txt"}, HTTPStatus: http.StatusOK},
 			true,
 		},
 		{
-			Config{Urls: []string{"https://google.com/"}, HttpStatus: http.StatusOK},
+			Config{Urls: []string{"https://google.com/"}, HTTPStatus: http.StatusOK},
 			true,
 		},
 		{
-			Config{Urls: []string{"https://google.com/fail"}, HttpStatus: http.StatusOK},
+			Config{Urls: []string{"https://google.com/fail"}, HTTPStatus: http.StatusOK},
 			false,
 		},
 		{
-			Config{Urls: []string{"https://google.com/fail"}, HttpStatus: http.StatusNotFound},
+			Config{Urls: []string{"https://google.com/fail"}, HTTPStatus: http.StatusNotFound},
 			true,
 		},
 		{
-			Config{Urls: []string{"https://google.com/", "https://google.com/fail"}, HttpStatus: http.StatusOK},
+			Config{Urls: []string{"https://google.com/", "https://google.com/fail"}, HTTPStatus: http.StatusOK},
 			false,
 		},
 	}
