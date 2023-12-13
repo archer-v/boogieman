@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/creasty/defaults"
 	"github.com/prometheus-community/pro-bing"
 	"strings"
 	"sync"
@@ -34,6 +35,7 @@ func New(options model.ProbeOptions, config Config) *Probe {
 	p := Probe{}
 	p.ProbeOptions = options
 	p.Name = name
+	_ = defaults.Set(&config)
 	p.Config = config
 	p.ProbeHandler.Config = config
 	p.SetRunner(p.Runner)
@@ -43,6 +45,7 @@ func New(options model.ProbeOptions, config Config) *Probe {
 func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 	var timings model.Timings
 	var wg sync.WaitGroup
+	var mutex sync.Mutex
 	done := 0
 	for _, host := range c.Hosts {
 		wg.Add(1)
@@ -59,12 +62,16 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 				if err != nil {
 					c.Log("[%v] %v, %vms", s, err, dur.Milliseconds())
 					if errors.Is(ErrTimeout, err) && !c.Expect {
+						mutex.Lock()
 						done++
+						mutex.Unlock()
 					}
 				} else {
 					timings.Set(s, dur)
 					if c.Expect {
+						mutex.Lock()
 						done++
+						mutex.Unlock()
 					}
 					c.Log("[%v] OK, %vms", s, dur.Milliseconds())
 				}
