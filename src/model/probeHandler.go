@@ -16,7 +16,6 @@ type ProbeHandler struct {
 	probingData       any           // a specific probe implementation saves a lastResult object here
 	runner            ProbeRunner   // probe runner func
 	finisher          ProbeFinisher // probe finisher func, only for probe that stays alive in background
-	logContext        string        // log prefix string
 	error             error         // last startup error
 	logger            Logger
 }
@@ -32,14 +31,7 @@ func (c *ProbeHandler) Start(ctx context.Context) (succ bool) {
 	}
 
 	c.curResult.PrepareToStart()
-
-	//var ctxID string
-	//if ctx != nil && ctx.Value("id") != nil {
-	//		ctxID = ctx.Value("id").(string)
-	//}
-
 	c.logger = GetLogger(ctx)
-	//c.SetLogContext(ctxID)
 	c.logDebug("Starting the probe runner")
 
 	var probingData any
@@ -104,14 +96,11 @@ func (c *ProbeHandler) SetFinisher(f ProbeFinisher) *ProbeHandler {
 
 // Log logouts the message, should be called internally from the probe
 func (c *ProbeHandler) Log(format string, args ...any) {
-	if c.logContext == "" {
-		c.SetLogContext("")
-	}
 	var delim string
 	if !strings.HasPrefix(format, "[") {
 		delim = " "
 	}
-	c.logger.Printf(c.logContext+delim+format+"\n", args...)
+	c.logger.Printf("["+c.Name+"]"+delim+format+"\n", args...)
 }
 
 func (c *ProbeHandler) logDebug(format string, args ...any) {
@@ -119,15 +108,6 @@ func (c *ProbeHandler) logDebug(format string, args ...any) {
 		return
 	}
 	c.Log("[debug] "+format, args...)
-}
-
-// SetLogContext sets log context, should be called internally from the probe
-func (c *ProbeHandler) SetLogContext(ctx string) {
-	if ctx != "" {
-		c.logContext = "[" + ctx + "][" + c.Name + "]"
-	} else {
-		c.logContext = "[" + c.Name + "]"
-	}
 }
 
 func (c *ProbeHandler) Error() error {
