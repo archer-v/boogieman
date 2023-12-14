@@ -62,18 +62,18 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 	status := c.cmd.Start()
 
 	timer := time.After(c.Timeout)
-	var timeoutError error
-	for finished.Runtime == 0 && timeoutError == nil {
+	var interrupted error
+	for finished.Runtime == 0 && interrupted == nil {
 		select {
 		// cmd has been finished
 		case finished = <-status:
 			break
 		// context cancel is happened
 		case <-ctx.Done():
-			timeoutError = ctx.Err()
-		// timeoutError is happened
+			interrupted = ctx.Err()
+		// interrupted is happened
 		case <-timer:
-			timeoutError = ErrTimeout
+			interrupted = ErrTimeout
 			break
 		// new lines in stdout / stderr
 		case line := <-c.cmd.Stdout:
@@ -89,13 +89,20 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 	// if the process should stay background
 	if c.StayBackground {
 		// a waiting timeout isn't happened, it means the process exited unexpectedly
-		if timeoutError == nil {
+		if interrupted == nil {
 			c.Log("Command should stay background but exited unexpectedly")
 			succ = false
 			err = ErrUnexpectedExit
 			return
 		}
-		// process waiting timeoutError is happened, process is still alive
+
+		if interrupted != ErrTimeout {
+			err = interrupted
+			succ = false
+			return
+		}
+
+		// process waiting timeout is happened, process is still alive
 		succ = true
 		// continue to read stdout/stderr of running process until channel closing
 		go func(cmd *cmd.Cmd) {
@@ -116,8 +123,8 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 		return
 	}
 
-	if timeoutError != nil {
-		err = timeoutError
+	if interrupted != nil {
+		err = interrupted
 		c.Finish(ctx)
 		return false, nil
 	}
