@@ -65,7 +65,11 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 			c.Log("[%v] %v, %vms", c.Host, err, c.Duration().Milliseconds())
 			c.SetError(err)
 		} else {
-			c.Log("[%v] OK, %vms", c.Host, c.Duration().Milliseconds())
+			r := "OK"
+			if !succ {
+				r = "FAIL"
+			}
+			c.Log("[%v] "+r+", %vms", c.Host, c.Duration().Milliseconds())
 		}
 	}()
 
