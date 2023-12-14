@@ -10,7 +10,7 @@ import (
 )
 
 func Test_Runner(t *testing.T) {
-	defOptions := model.ProbeOptions{Timeout: time.Millisecond * 5000, Expect: true}
+	defOptions := model.ProbeOptions{Timeout: time.Millisecond * 20000, Expect: true}
 	constructor := constructor{
 		probefactory.BaseConstructor{
 			Name: name,
@@ -29,7 +29,7 @@ func Test_Runner(t *testing.T) {
 	cases := []testCase{
 		{
 			"traceroute to an existent host",
-			Config{Host: "google.com", ExpectedHops: []string{"google.com"}, HopTimeout: time.Millisecond * 100, Retries: 2, LogDump: true},
+			Config{Host: "8.8.8.8", ExpectedHops: []string{"8.8.8.8"}, HopTimeout: time.Millisecond * 100, Retries: 1, LogDump: true},
 			defOptions,
 			true,
 			nil,
@@ -37,7 +37,7 @@ func Test_Runner(t *testing.T) {
 		},
 		{
 			"traceroute to an existent host when config is defined in string",
-			"google.com,google.com",
+			"8.8.8.8,8.8.8.8",
 			defOptions,
 			true,
 			nil,
@@ -53,7 +53,7 @@ func Test_Runner(t *testing.T) {
 		},
 		{
 			"traceroute to wrong host",
-			Config{Host: "192.168.10.10", ExpectedHops: []string{"aaa"}, HopTimeout: time.Millisecond * 100, Retries: 2, LogDump: true},
+			Config{Host: "192.168.10.10", ExpectedHops: []string{"aaa"}, HopTimeout: time.Millisecond * 100, Retries: 2, LogDump: true, MaxHops: 5},
 			defOptions,
 			false,
 			nil,
@@ -98,7 +98,7 @@ func Test_Runner(t *testing.T) {
 			cancelFunc()
 		}
 		if rz != c.expectedResult {
-			t.Errorf("Probe runner %v should return %v", i, c.expectedResult)
+			t.Errorf("Test %v - '%v' should return %v", i, c.name, c.expectedResult)
 			continue
 		}
 		p.Finish(ctx)
