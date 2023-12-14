@@ -9,7 +9,6 @@ import (
 )
 
 func Test_Runner(t *testing.T) {
-
 	ctx := context.Background()
 	options := model.ProbeOptions{Timeout: time.Millisecond * 2000, Expect: true}
 
@@ -24,7 +23,7 @@ func Test_Runner(t *testing.T) {
 			true,
 		},
 		{
-			Config{Hosts: []string{"google.com"}},
+			Config{Hosts: []string{"localhost"}},
 			true,
 		},
 		{
