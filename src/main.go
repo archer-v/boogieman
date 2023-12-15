@@ -27,7 +27,7 @@ const (
 	ShutdownWaitingTimeout = 30 * time.Second
 )
 
-var gitTag, gitCommit, gitBranch, buildTimestamp, version string
+var gitTag, gitCommit, gitBranch, buildTimestamp string
 
 var finisher = &finish.Finisher{Timeout: ShutdownWaitingTimeout}
 
