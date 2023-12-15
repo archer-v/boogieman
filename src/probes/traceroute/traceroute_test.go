@@ -35,7 +35,7 @@ func Test_Runner(t *testing.T) {
 
 	cases := []testCase{
 		{
-			"traceroute to localhost host",
+			"traceroute to host " + defPublicTestHost,
 			Config{Host: defPublicTestHost, ExpectedHops: []string{defPublicTestHost}, HopTimeout: time.Millisecond * 100, Retries: 1, LogDump: true},
 			defOptions,
 			true,
@@ -43,7 +43,7 @@ func Test_Runner(t *testing.T) {
 			0,
 		},
 		{
-			"traceroute to an existent host when config is defined in string",
+			"traceroute to host " + defPublicTestHost + " when config is defined in string",
 			defPublicTestHost + "," + defPublicTestHost,
 			defOptions,
 			true,
