@@ -13,6 +13,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -31,12 +32,7 @@ var gitTag, gitCommit, gitBranch, buildTimestamp, version string
 var finisher = &finish.Finisher{Timeout: ShutdownWaitingTimeout}
 
 func main() {
-	if buildTimestamp == "" {
-		version = "DEV"
-	} else {
-		version = fmt.Sprintf("%v-%v-%v, build: %v", gitTag, gitBranch, gitCommit, buildTimestamp)
-	}
-
+	version := versionString()
 	configuration.AppVersion = version
 	configuration.AppDescriptionMessage = "version: " + version
 
@@ -102,4 +98,23 @@ func runScriptAndExit(config configuration.StartupConfig) {
 	}
 
 	os.Exit(ExitFailed)
+}
+
+func versionString() (version string) {
+	if buildTimestamp == "" {
+		version = "DEV"
+	} else {
+		var ids []string
+		if gitTag != "" {
+			ids = append(ids, gitTag)
+		}
+		if gitBranch != "" {
+			ids = append(ids, gitBranch)
+		}
+		if gitCommit != "" {
+			ids = append(ids, gitCommit)
+		}
+		version = fmt.Sprintf("%v, build: %v", strings.Join([]string{gitTag, gitBranch, gitCommit}, "-"), buildTimestamp)
+	}
+	return
 }
