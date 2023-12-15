@@ -114,7 +114,7 @@ func versionString() (version string) {
 		if gitCommit != "" {
 			ids = append(ids, gitCommit)
 		}
-		version = fmt.Sprintf("%v, build: %v", strings.Join([]string{gitTag, gitBranch, gitCommit}, "-"), buildTimestamp)
+		version = fmt.Sprintf("%v, build: %v", strings.Join(ids, "-"), buildTimestamp)
 	}
 	return
 }
