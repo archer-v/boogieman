@@ -1,7 +1,7 @@
 # boogieman
-The probing utility, is designed to monitor the availability of host nodes, networks, services, and processes. It serves as a lightweight and straightforward tool, ideal for integration into automation scripts or as a metrics provider in various DevOps and NOC operations. All probes within this utility expose their data as Prometheus metrics or a JSON formatted object exposed at a http port, making it a reliable source for availability metrics related to hosts, networks, routes, and network services.
+The probing utility, is designed to monitor the availability of host nodes, networks, services, and processes. It serves as a lightweight and straightforward tool, ideal for integration into automation scripts or as a metrics provider in various DevOps and network operations. All probes within this utility expose their data as Prometheus metrics or a JSON formatted object exposed at a http port, making it a reliable source for availability metrics related to hosts, networks, routes, and network services.
 
-The utility can perform single or composite checks combined in a scenario described in configuration file in a YAML format
+The utility can perform single or composite checks combined in a scenario described in configuration file in a YAML format. Checks can be executed in parallel, so an entire scenario can execute quickly.
 
 ### Available checks (probes): 
 - ping
@@ -14,8 +14,8 @@ The utility can perform single or composite checks combined in a scenario descri
 All probes can returns additional data, like timings, response codes, stdout, etc
 
 ### Working modes
-- console mode: performs single scenario or probe run with text or JSON output to stdout
-- continuos (daemon) monitoring mode: performs regular checks and exposes the results as prometheus metrics or json
+- console mode: performs single scenario or probe run with text or JSON formatted output to stdout
+- continuos (daemon) monitoring mode: performs regular checks and exposes the results as prometheus metrics or a json formatted string
 ```
 ./boogieman
 boogieman - version: devel-main-b61f6e4, build: 2023-12-12_210008
