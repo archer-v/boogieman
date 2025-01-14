@@ -122,7 +122,7 @@ global:
   # bind the service to the interface:port
   bind_to: localhost:9091
   # service exit if any of the config files have been modified; 
-  # this is useful for automatically restarting the service by systemd when the configuration
+  # this is useful for automatically restarting the service by systemd when the configuration changes
   exit_on_config_change: true
 jobs:
   - script: test/script-openvpn.yml
