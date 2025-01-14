@@ -6,6 +6,7 @@ require (
 	github.com/archer-v/gotraceroute v0.1.2
 	github.com/creasty/defaults v1.7.0
 	github.com/enriquebris/goconcurrentqueue v0.7.0
+	github.com/fsnotify/fsnotify v1.8.0
 	github.com/go-cmd/cmd v1.3.0
 	github.com/go-co-op/gocron v1.36.0
 	github.com/integrii/flaggy v1.5.2

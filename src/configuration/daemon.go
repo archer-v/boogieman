@@ -10,8 +10,9 @@ import (
 )
 
 type GlobalOptions struct {
-	DefaultSchedule string `json:"default_schedule"`
-	BindTo          string `json:"bind_to" default:"localhost:9091"`
+	DefaultSchedule    string `json:"default_schedule"`
+	BindTo             string `json:"bind_to" default:"localhost:9091"`
+	ExitOnConfigChange bool   `json:"exit_on_config_change" default:"false"`
 }
 
 type DaemonConfig struct {

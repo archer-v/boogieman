@@ -12,6 +12,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/enriquebris/goconcurrentqueue v0.7.0 h1:JYrDa45N3xo3Sr9mjvlRaWiBHvBEJIhAdLXO3VGVghA=
 github.com/enriquebris/goconcurrentqueue v0.7.0/go.mod h1:OZ+KC2BcRYzjg0vgoUs1GFqdAjkD9mz2Ots7Jbm1yS4=
+github.com/fsnotify/fsnotify v1.8.0 h1:dAwr6QBTBZIkG8roQaJjGof0pp0EeF+tNV7YBP3F/8M=
+github.com/fsnotify/fsnotify v1.8.0/go.mod h1:8jBTzvmWwFyi3Pb8djgCCO5IBqzKJ/Jwo8TRcHyHii0=
 github.com/go-cmd/cmd v1.3.0 h1:Wet2eYkLouFqyiG+x6P6l8CICRywhRD6sjMNalTSvbs=
 github.com/go-cmd/cmd v1.3.0/go.mod h1:l/X/csRuYRDqiQIz9PPJBn4xDrdxgBXeLE9x1BeFU6M=
 github.com/go-co-op/gocron v1.36.0 h1:sEmAwg57l4JWQgzaVWYfKZ+w13uHOqeOtwjo72Ll5Wc=

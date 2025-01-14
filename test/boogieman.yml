@@ -1,6 +1,11 @@
 global:
+# default schedule for the job if it's not defined
   default_schedule: 60s
+# bind the service to the interface:port
   bind_to: localhost:9091
+# Service exit if any of the config files have been modified; 
+# this is useful for automatically restarting the service by systemd when the configuration changes
+  exit_on_config_change: true 
 jobs:
   - script: test/script-openvpn.yml
     name: TestJob1

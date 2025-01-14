@@ -6,6 +6,7 @@ import (
 	"boogieman/src/services/prometheus"
 	"boogieman/src/services/scheduler"
 	"boogieman/src/services/webserver"
+	"boogieman/src/util"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -29,7 +31,10 @@ const (
 
 var gitTag, gitCommit, gitBranch, buildTimestamp string
 
-var finisher = &finish.Finisher{Timeout: ShutdownWaitingTimeout}
+var finisher = &finish.Finisher{
+	Timeout: ShutdownWaitingTimeout,
+	Log:     util.FinisherLogger(),
+}
 
 func main() {
 	version := versionString()
@@ -71,6 +76,24 @@ func main() {
 			log.Printf("[%v] error with creating a scheduling job: %v\n", j.Name, err)
 		}
 	}
+
+	if config.ExitOnConfigChange {
+		watcher, err := util.Watcher(
+			[]string{config.ConfigFileName},
+			func(path, op string) {
+				// exit
+				_ = syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+			})
+		if err != nil {
+			log.Printf("error with creating a file watcher: %v\n", err)
+			os.Exit(ExitErrConfig)
+		}
+		finisher.Add(watcher, finish.WithName("file watcher"))
+		for _, j := range config.ScheduleJobs {
+			_ = watcher.Add(j.ScriptFile)
+		}
+	}
+
 	finisher.Wait()
 	os.Exit(ExitOk)
 }

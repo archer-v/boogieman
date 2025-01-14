@@ -61,7 +61,7 @@ oneRun - performs a single run, print result and exit
 
 #### Daemon mode
 
-`./boogieman daemon --config test/boogieman.yml` will start the utility in a daemon mode with configuration read from test/boogieman.yml. 
+`./boogieman daemon --config test/boogieman.yml` will start the service in a daemon mode with configuration read from test/boogieman.yml. 
 
 Configuration file contains global options, list of jobs (scripts) and a schedule of their execution. HTTP server is listen at the tcp port (default 9091) and exposes scripts execution result as a prometheus metrics and json format text.
 
@@ -117,8 +117,13 @@ script:
 **Daemon configuration file:**
 ```
 global:
+  # default schedule for the job if it's not defined 
   default_schedule: 60s
+  # bind the service to the interface:port
   bind_to: localhost:9091
+  # service exit if any of the config files have been modified; 
+  # this is useful for automatically restarting the service by systemd when the configuration
+  exit_on_config_change: true
 jobs:
   - script: test/script-openvpn.yml
     name: TestJob1
