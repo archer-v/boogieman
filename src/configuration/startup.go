@@ -32,16 +32,17 @@ type startupOptions struct {
 	ProbeOptionsExpect  bool `envconfig:"default=true"`
 	Debug               bool
 	VerboseLog          bool
-	Config              string
+	//Config              string
 }
 
 type StartupConfig struct {
-	Mode         StartupMode
-	JSON         bool
-	PrettyJSON   bool
-	BindTo       string
-	Script       *model.Script
-	ScheduleJobs []model.ScheduleJob
+	Mode           StartupMode
+	JSON           bool
+	PrettyJSON     bool
+	Script         *model.Script
+	ScheduleJobs   []model.ScheduleJob
+	ConfigFileName string
+	GlobalOptions
 }
 
 //nolint:funlen
@@ -72,7 +73,7 @@ func StartupConfiguration() (config StartupConfig, err error) {
 
 	daemon := flaggy.NewSubcommand("daemon")
 	daemon.Description = "start in daemon mode and performs scheduled jobs"
-	daemon.String(&o.Config, "c", "config", "path to a configuration file in yml format")
+	daemon.String(&config.ConfigFileName, "c", "config", "path to a configuration file in yml format")
 
 	flaggy.AttachSubcommand(oneRun, 1)
 	flaggy.AttachSubcommand(daemon, 1)
@@ -128,13 +129,13 @@ func StartupConfiguration() (config StartupConfig, err error) {
 		return
 	case daemon.Used:
 		config.Mode = StartupModeDaemon
-		if o.Config == "" {
+		if config.ConfigFileName == "" {
 			err = errors.New("configuration file should be defined in a daemon mode")
 			flaggy.ShowHelp(err.Error())
 			return
 		}
 		var data []byte
-		data, err = os.ReadFile(o.Config)
+		data, err = os.ReadFile(config.ConfigFileName)
 		if err != nil {
 			return
 		}
@@ -143,7 +144,7 @@ func StartupConfiguration() (config StartupConfig, err error) {
 			err = fmt.Errorf("can't parse configuration from file: %w", e)
 			return
 		}
-		config.BindTo = daemonConfig.Global.BindTo
+		config.GlobalOptions = daemonConfig.Global
 		config.ScheduleJobs = daemonConfig.Jobs
 	default:
 		flaggy.ShowHelp("")
