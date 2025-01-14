@@ -1,0 +1,20 @@
+name: Build and test
+on: [ push ]
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ ubuntu-latest ]
+    steps:
+      - run: env
+      - uses: actions/checkout@v2
+      - name: Install openvpn 
+        run: |
+          sudo apt-get update
+          sudo apt-get install openvpn
+      - uses: actions/setup-go@v2
+      - run: sudo --preserve-env=GITHUB_ACTIONS go test -race -coverprofile coverage.txt -coverpkg ./... -covermode atomic ./...
+      - uses: codecov/codecov-action@v1
+        with:
+          file: coverage.txt
