@@ -10,6 +10,9 @@ script:
         hosts:
           - 127.0.0.1
           - 127.0.0.2
+    metricLabels:
+      label1: value1
+      lebel2: value2
   - name: internet-alive
     cgroup: 1
     probe:

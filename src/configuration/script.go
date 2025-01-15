@@ -15,9 +15,10 @@ type script struct {
 }
 
 type task struct {
-	Name   string
-	Probe  probe
-	CGroup string
+	Name         string
+	Probe        probe
+	CGroup       string
+	MetricLabels model.MetricLabels `json:"metricLabels"`
 }
 
 type probe struct {
@@ -76,7 +77,7 @@ func ScriptYMLConfiguration(data []byte, overrideConfigOptions ...map[string]map
 			err = fmt.Errorf("[%v] %w", t.Name, err)
 			return
 		}
-		s.AddTask(model.NewTask(t.Name, t.CGroup, p))
+		s.AddTask(model.NewTask(t.Name, t.CGroup, t.MetricLabels, p))
 	}
 	return
 }

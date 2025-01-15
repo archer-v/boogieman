@@ -1,22 +1,39 @@
 package scheduler
 
 import (
+	"boogieman/src/model"
 	"github.com/prometheus/client_golang/prometheus"
 	"reflect"
 	"strconv"
 )
 
+var (
+	probeDataGeneralLabels     = []string{"job", "script", "task", "probe"}
+	probeDateItemGeneralLabels = []string{"job", "script", "task", "probe", "item"}
+	taskGeneralLabels          = []string{"job", "script", "task"}
+)
+
+const (
+	probeDataHelpDescr = "probe execution data result"
+	probeDataName      = "boogieman_probe_data"
+	probeDataItemName  = "boogieman_probe_data_item"
+)
+
+// prometheus general metrics descriptors
 var pDescriptors = map[string]*prometheus.Desc{
 	"script_result":   prometheus.NewDesc("boogieman_script_result", "script execution result", []string{"job", "script"}, nil),
-	"task_result":     prometheus.NewDesc("boogieman_task_result", "task execution result", []string{"job", "script", "task"}, nil),
-	"task_runtime":    prometheus.NewDesc("boogieman_task_runtime", "task runtime", []string{"job", "script", "task"}, nil),
-	"task_runs":       prometheus.NewDesc("boogieman_task_runs", "task run counter", []string{"job", "script", "task"}, nil),
-	"probe_data":      prometheus.NewDesc("boogieman_probe_data", "probe execution data result", []string{"job", "script", "task", "probe"}, nil),
-	"probe_data_item": prometheus.NewDesc("boogieman_probe_data_item", "probe execution data result", []string{"job", "script", "task", "probe", "item"}, nil),
+	"task_result":     prometheus.NewDesc("boogieman_task_result", "task execution result", taskGeneralLabels, nil),
+	"task_runtime":    prometheus.NewDesc("boogieman_task_runtime", "task runtime", taskGeneralLabels, nil),
+	"task_runs":       prometheus.NewDesc("boogieman_task_runs", "task run counter", taskGeneralLabels, nil),
+	"probe_data":      prometheus.NewDesc(probeDataName, probeDataHelpDescr, probeDataGeneralLabels, nil),
+	"probe_data_item": prometheus.NewDesc(probeDataItemName, probeDataHelpDescr, probeDateItemGeneralLabels, nil),
 }
 
+// prometheus dynamic metrics descriptors (metrics that contains custom or dynamic labels)
+var pDynamicDescriptors = map[string]*prometheus.Desc{}
+
+// probe metrics struct
 type probeDataMetric struct {
-	descr     *prometheus.Desc
 	valueType prometheus.ValueType
 	value     float64
 	labels    []string
@@ -39,26 +56,52 @@ func (s *Scheduler) Collect(ch chan<- prometheus.Metric) {
 			j.Name, j.ScriptFile,
 		)
 		for _, t := range scriptResult.Tasks {
-			labels := []string{j.Name, j.ScriptFile, t.Name}
+			// task general metrics
+			taskMetricLabelValues := []string{j.Name, j.ScriptFile, t.Name}
 			ch <- prometheus.MustNewConstMetric(
 				pDescriptors["task_result"],
 				prometheus.GaugeValue, gbValue(t.Success),
-				labels...,
+				taskMetricLabelValues...,
 			)
 			ch <- prometheus.MustNewConstMetric(
 				pDescriptors["task_runtime"],
 				prometheus.GaugeValue, float64(t.RuntimeMs),
-				labels...,
+				taskMetricLabelValues...,
 			)
 			ch <- prometheus.MustNewConstMetric(
 				pDescriptors["task_runs"],
 				prometheus.CounterValue, float64(t.RunCounter),
-				labels...,
+				taskMetricLabelValues...,
 			)
+			// task data metrics
 			if t.Probe.Data != nil {
-				ms := probeMetrics(t.Probe.Data, addToArray(labels, t.Probe.Name))
+				dataMetricLabelValues := taskMetricLabelValues[:]
+				dataMetricLabelValues = append(dataMetricLabelValues, t.Probe.Name)
+				// check if there are additional metric labels for this task
+				var taskLabels model.MetricLabels
+				for _, task := range j.Script.Tasks {
+					if task.Name == t.Name {
+						taskLabels = task.MetricLabels
+						break
+					}
+				}
+				if !taskLabels.IsEmpty() {
+					//todo need to add custom dynamic labels
+					/*
+						if value, exists := pDynamicDescriptors[taskLabels.CombinedKey()]; exists {
+
+						}
+					*/
+				}
+				ms := probeMetrics(t.Probe.Data)
 				for _, m := range ms {
-					ch <- prometheus.MustNewConstMetric(m.descr, m.valueType, m.value, m.labels...)
+					if len(m.labels) == 0 {
+						ch <- prometheus.MustNewConstMetric(pDescriptors["probe_data"], m.valueType, m.value, dataMetricLabelValues...)
+					} else {
+						labelValues := dataMetricLabelValues[:]
+						labelValues = append(labelValues, m.labels...)
+						ch <- prometheus.MustNewConstMetric(pDescriptors["probe_data_item"], m.valueType, m.value, labelValues...)
+					}
 				}
 			}
 		}
@@ -88,13 +131,15 @@ func reflectIsFloat(kind reflect.Kind) bool {
 	return kind == reflect.Float32 || kind == reflect.Float64
 }
 
+// probeMetrics returns a slice of probe metrics
+// data can be a simple value or hash of names and values
+//
 //nolint:funlen
-func probeMetrics(data any, labels []string) (metrics []probeDataMetric) {
+func probeMetrics(data any) (metrics []probeDataMetric) {
 	var (
-		descr     *prometheus.Desc
-		value     float64
 		valueType = prometheus.GaugeValue
-		l         = labels
+		labels    []string
+		value     float64
 	)
 
 	v := reflect.ValueOf(data)
@@ -104,35 +149,8 @@ func probeMetrics(data any, labels []string) (metrics []probeDataMetric) {
 
 	kind := v.Kind()
 
-	switch {
-	case kind == reflect.Bool:
-		descr = pDescriptors["probe_data"]
-		value = gbValue(v.Bool())
-	case reflectIsInt(kind):
-		descr = pDescriptors["probe_data"]
-		value = float64(v.Int())
-	case reflectIsFloat(kind):
-		descr = pDescriptors["probe_data"]
-		value = v.Float()
-	case kind == reflect.String:
-		descr = pDescriptors["probe_data_item"]
-		value = 1
-		l = addToArray(labels, v.String())
-	}
-
-	if descr != nil {
-		return []probeDataMetric{
-			{
-				descr:     descr,
-				valueType: valueType,
-				value:     value,
-				labels:    l,
-			},
-		}
-	}
-
+	// if data is a map
 	if kind == reflect.Map {
-		descr = pDescriptors["probe_data_item"]
 		iter := v.MapRange()
 		stop := false
 		for iter.Next() && !stop {
@@ -140,9 +158,9 @@ func probeMetrics(data any, labels []string) (metrics []probeDataMetric) {
 			v := iter.Value()
 			switch {
 			case reflectIsInt(k.Kind()):
-				l = addToArray(labels, strconv.Itoa(int(k.Int())))
+				labels = []string{strconv.Itoa(int(k.Int()))}
 			case k.Kind() == reflect.String:
-				l = addToArray(labels, k.String())
+				labels = []string{k.String()}
 			default:
 				// unsupported type of map key
 				stop = true
@@ -161,14 +179,32 @@ func probeMetrics(data any, labels []string) (metrics []probeDataMetric) {
 			}
 
 			metrics = append(metrics, probeDataMetric{
-				descr:     descr,
 				valueType: valueType,
 				value:     value,
-				labels:    l,
+				labels:    labels,
 			})
 		}
 		return metrics
 	}
 
-	return
+	// data contains simple value
+	switch {
+	case kind == reflect.Bool:
+		value = gbValue(v.Bool())
+	case reflectIsInt(kind):
+		value = float64(v.Int())
+	case reflectIsFloat(kind):
+		value = v.Float()
+	case kind == reflect.String:
+		value = 1
+		labels = []string{v.String()}
+	}
+
+	return []probeDataMetric{
+		{
+			valueType: valueType,
+			value:     value,
+			labels:    labels,
+		},
+	}
 }

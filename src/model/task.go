@@ -3,9 +3,10 @@ package model
 import "context"
 
 type Task struct {
-	Name   string
-	CGroup string `json:"-"`
-	Probe  Prober
+	Name         string
+	CGroup       string       `json:"-"`
+	MetricLabels MetricLabels `json:"-"`
+	Probe        Prober
 	Worker
 }
 
@@ -46,11 +47,12 @@ func (t *Task) ResultFinished() (tr TaskResult) {
 	return
 }
 
-func NewTask(taskName string, cgroup string, probe Prober) (t *Task) {
+func NewTask(taskName string, cgroup string, metricLabels MetricLabels, probe Prober) (t *Task) {
 	t = &Task{
-		Name:   taskName,
-		CGroup: cgroup,
-		Probe:  probe,
+		Name:         taskName,
+		CGroup:       cgroup,
+		MetricLabels: metricLabels,
+		Probe:        probe,
 		Worker: Worker{
 			EStatus: EStatusNew,
 		},
