@@ -19,7 +19,7 @@ type ProbeResult struct {
 	Options       ProbeOptions `json:"options"`
 	Configuration any          `json:"configuration"`
 	Result
-	Data any `json:"data"`
+	Data any `json:"data"` // store last the result of the probing, the data type depends on probe
 }
 
 type Prober interface {
