@@ -5,6 +5,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"reflect"
 	"strconv"
+	"strings"
 )
 
 var (
@@ -14,23 +15,22 @@ var (
 )
 
 const (
-	probeDataHelpDescr = "probe execution data result"
-	probeDataName      = "boogieman_probe_data"
-	probeDataItemName  = "boogieman_probe_data_item"
+	probeDataHelpDescr         = "probe execution data result"
+	probeDataName              = "boogieman_probe_data"
+	probeDataItemName          = "boogieman_probe_data_item"
+	descriptorKeyProbeData     = "probe_data"
+	descriptorKeyProbeDataItem = "probe_data_item"
 )
 
-// prometheus general metrics descriptors
+// prometheus metrics descriptors
 var pDescriptors = map[string]*prometheus.Desc{
-	"script_result":   prometheus.NewDesc("boogieman_script_result", "script execution result", []string{"job", "script"}, nil),
-	"task_result":     prometheus.NewDesc("boogieman_task_result", "task execution result", taskGeneralLabels, nil),
-	"task_runtime":    prometheus.NewDesc("boogieman_task_runtime", "task runtime", taskGeneralLabels, nil),
-	"task_runs":       prometheus.NewDesc("boogieman_task_runs", "task run counter", taskGeneralLabels, nil),
-	"probe_data":      prometheus.NewDesc(probeDataName, probeDataHelpDescr, probeDataGeneralLabels, nil),
-	"probe_data_item": prometheus.NewDesc(probeDataItemName, probeDataHelpDescr, probeDateItemGeneralLabels, nil),
+	"script_result":            prometheus.NewDesc("boogieman_script_result", "script execution result", []string{"job", "script"}, nil),
+	"task_result":              prometheus.NewDesc("boogieman_task_result", "task execution result", taskGeneralLabels, nil),
+	"task_runtime":             prometheus.NewDesc("boogieman_task_runtime", "task runtime", taskGeneralLabels, nil),
+	"task_runs":                prometheus.NewDesc("boogieman_task_runs", "task run counter", taskGeneralLabels, nil),
+	descriptorKeyProbeData:     prometheus.NewDesc(probeDataName, probeDataHelpDescr, probeDataGeneralLabels, nil),
+	descriptorKeyProbeDataItem: prometheus.NewDesc(probeDataItemName, probeDataHelpDescr, probeDateItemGeneralLabels, nil),
 }
-
-// prometheus dynamic metrics descriptors (metrics that contains custom or dynamic labels)
-var pDynamicDescriptors = map[string]*prometheus.Desc{}
 
 // probe metrics struct
 type probeDataMetric struct {
@@ -45,6 +45,7 @@ func (s *Scheduler) Describe(chan<- *prometheus.Desc) {
 }
 
 // Collect - implementation of prometheus.Collector interface
+// invokes metrics from each job and tasks, prepares and send data to prometheus module
 func (s *Scheduler) Collect(ch chan<- prometheus.Metric) {
 	s.Lock()
 	defer s.Unlock()
@@ -75,8 +76,6 @@ func (s *Scheduler) Collect(ch chan<- prometheus.Metric) {
 			)
 			// task data metrics
 			if t.Probe.Data != nil {
-				dataMetricLabelValues := taskMetricLabelValues[:]
-				dataMetricLabelValues = append(dataMetricLabelValues, t.Probe.Name)
 				// check if there are additional metric labels for this task
 				var taskLabels model.MetricLabels
 				for _, task := range j.Script.Tasks {
@@ -86,22 +85,48 @@ func (s *Scheduler) Collect(ch chan<- prometheus.Metric) {
 					}
 				}
 				if !taskLabels.IsEmpty() {
-					//todo need to add custom dynamic labels
-					/*
-						if value, exists := pDynamicDescriptors[taskLabels.CombinedKey()]; exists {
 
-						}
-					*/
 				}
+				dataMetricLabelValues := taskMetricLabelValues[:]
+				dataMetricLabelValues = append(dataMetricLabelValues, t.Probe.Name)
 				ms := probeMetrics(t.Probe.Data)
 				for _, m := range ms {
+					var (
+						labelValues    []string
+						pDescriptorKey string
+					)
 					if len(m.labels) == 0 {
-						ch <- prometheus.MustNewConstMetric(pDescriptors["probe_data"], m.valueType, m.value, dataMetricLabelValues...)
+						labelValues = dataMetricLabelValues
+						pDescriptorKey = descriptorKeyProbeData
 					} else {
-						labelValues := dataMetricLabelValues[:]
+						labelValues = dataMetricLabelValues[:]
 						labelValues = append(labelValues, m.labels...)
-						ch <- prometheus.MustNewConstMetric(pDescriptors["probe_data_item"], m.valueType, m.value, labelValues...)
+						pDescriptorKey = descriptorKeyProbeDataItem
 					}
+					// has dynamic labels
+					if !taskLabels.IsEmpty() {
+						descriptorKey := strings.Join(taskMetricLabelValues, "|")
+						if _, exists := pDescriptors[descriptorKey]; !exists {
+							var (
+								labels []string
+								name   string
+							)
+
+							switch pDescriptorKey {
+							case descriptorKeyProbeData:
+								labels = probeDataGeneralLabels
+								name = probeDataName
+							case descriptorKeyProbeDataItem:
+								labels = probeDateItemGeneralLabels
+								name = probeDataItemName
+							}
+
+							pDescriptors[descriptorKey] =
+								prometheus.NewDesc(name, probeDataHelpDescr, labels, taskLabels.Data())
+						}
+						pDescriptorKey = descriptorKey
+					}
+					ch <- prometheus.MustNewConstMetric(pDescriptors[pDescriptorKey], m.valueType, m.value, labelValues...)
 				}
 			}
 		}
