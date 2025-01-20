@@ -18,14 +18,7 @@ func Test_probeDataMetric(t *testing.T) {
 		expectedResult []expectedResult
 	}
 
-	addLabel := func(arr []string, s string) []string {
-		r := make([]string, len(arr)+1)
-		copy(r, arr)
-		r[len(arr)] = s
-		return r
-	}
 	var testString = "test"
-	labels := []string{"one", "two"}
 	cases := []testCase{
 		{
 			data: 10,
@@ -33,7 +26,7 @@ func Test_probeDataMetric(t *testing.T) {
 				{
 					prometheus.GaugeValue,
 					float64(10),
-					labels,
+					[]string{},
 				},
 			},
 		},
@@ -43,7 +36,7 @@ func Test_probeDataMetric(t *testing.T) {
 				{
 					prometheus.GaugeValue,
 					float64(1),
-					labels,
+					[]string{},
 				},
 			},
 		},
@@ -53,7 +46,7 @@ func Test_probeDataMetric(t *testing.T) {
 				{
 					prometheus.GaugeValue,
 					float64(1),
-					addLabel(labels, testString),
+					[]string{testString},
 				},
 			},
 		},
@@ -63,7 +56,7 @@ func Test_probeDataMetric(t *testing.T) {
 				{
 					prometheus.GaugeValue,
 					10.5,
-					labels,
+					[]string{},
 				},
 			},
 		},
@@ -73,7 +66,7 @@ func Test_probeDataMetric(t *testing.T) {
 				{
 					prometheus.GaugeValue,
 					float64(1),
-					addLabel(labels, testString),
+					[]string{testString},
 				},
 			},
 		},
@@ -86,19 +79,19 @@ func Test_probeDataMetric(t *testing.T) {
 				{
 					prometheus.GaugeValue,
 					float64(20),
-					addLabel(labels, "val1"),
+					[]string{"val1"},
 				},
 				{
 					prometheus.GaugeValue,
 					float64(30),
-					addLabel(labels, "val2"),
+					[]string{"val2"},
 				},
 			},
 		},
 	}
 
 	for i, c := range cases {
-		metrics := probeMetrics(c.data, labels)
+		metrics := probeMetrics(c.data)
 		if len(metrics) != len(c.expectedResult) {
 			t.Errorf("Case %v should return %v metrics, but got %v", i, len(c.expectedResult), len(metrics))
 			continue
@@ -119,7 +112,7 @@ func Test_probeDataMetric(t *testing.T) {
 			}
 			for idx, l := range m.labels {
 				if l != exp.labels[idx] {
-					t.Errorf("Case %v should return label %v at index %v, but got %v", i, exp.labels[idx], idx, l)
+					t.Errorf("Case %v should return labels %v at index %v, but got %v", i, exp.labels[idx], idx, l)
 					continue
 				}
 			}

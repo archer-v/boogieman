@@ -1,18 +1,26 @@
 script:
   - name: gateway-alive
+    # concurrent group, all tasks in this group will be executed concurrently
     cgroup: 1
     probe:
+      # probe name
       name: ping
       options:
         timeout: 100
       configuration:
-        # localhost just for an example
+        # hosts to ping
         hosts:
           - 127.0.0.1
           - 127.0.0.2
-    metricLabels:
-      label1: value1
-      lebel2: value2
+    metric:
+      # labels to add to the metric data
+      labels:
+        label1: value1
+        lebel2: value2
+      # labels values mapping for metric data
+      valueMap:
+        127.0.0.1: host1
+        127.0.0.2: host2
   - name: internet-alive
     cgroup: 1
     probe:
@@ -23,11 +31,13 @@ script:
         urls:
           - https://google.com/
           - https://github.com/
+        # expected http status
         httpStatus: 200
   - name: backup-gateway-disabled
     probe:
       name: ping
       options:
+        # expected probing result
         expect: false
         timeout: 200
       configuration:

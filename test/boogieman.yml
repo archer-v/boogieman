@@ -3,9 +3,9 @@ global:
   default_schedule: 60s
 # bind the service to the interface:port
   bind_to: localhost:9091
-# Service exit if any of the config files have been modified; 
+# Service exit if any of the config files have been modified;
 # this is useful for automatically restarting the service by systemd when the configuration changes
-  exit_on_config_change: true 
+  exit_on_config_change: true
 jobs:
   - script: test/script-openvpn.yml
     name: TestJob1
@@ -19,7 +19,7 @@ jobs:
     timeout: 10000
     vars:
       gateway-alive:
-        hosts: 127.0.0.3, 127.0.0.4
+        hosts: 127.0.0.1, 127.0.0.2
       internet-alive:
         urls: https://msn.com/
   - script: test/script-cmd.yml

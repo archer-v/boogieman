@@ -9,35 +9,59 @@ import (
 )
 
 var (
-	probeDataGeneralLabels     = []string{"job", "script", "task", "probe"}
-	probeDateItemGeneralLabels = []string{"job", "script", "task", "probe", "item"}
-	taskGeneralLabels          = []string{"job", "script", "task"}
+	LabelsScriptGeneral        = []string{"job", "script"}
+	LabelsTaskGeneral          = []string{"job", "script", "task"}
+	LabelsProbeDataGeneral     = []string{"job", "script", "task", "probe"}
+	LabelsProbeDateItemGeneral = []string{"job", "script", "task", "probe", "item"}
 )
 
 const (
-	probeDataHelpDescr         = "probe execution data result"
-	probeDataName              = "boogieman_probe_data"
-	probeDataItemName          = "boogieman_probe_data_item"
-	descriptorKeyProbeData     = "probe_data"
-	descriptorKeyProbeDataItem = "probe_data_item"
+	probeDataHelpDescr = "probe execution data result"
+	pNameData          = "boogieman_probe_data"
+	pNameDataItem      = "boogieman_probe_data_item"
+	pNameScriptResult  = "boogieman_script_result"
+	pNameTaskResult    = "boogieman_task_result"
+	pNameTaskRuntime   = "boogieman_task_runtime"
+	pNameTaskRuns      = "boogieman_task_runs"
 )
 
-// prometheus metrics descriptors
-var pDescriptors = map[string]*prometheus.Desc{
-	"script_result":            prometheus.NewDesc("boogieman_script_result", "script execution result", []string{"job", "script"}, nil),
-	"task_result":              prometheus.NewDesc("boogieman_task_result", "task execution result", taskGeneralLabels, nil),
-	"task_runtime":             prometheus.NewDesc("boogieman_task_runtime", "task runtime", taskGeneralLabels, nil),
-	"task_runs":                prometheus.NewDesc("boogieman_task_runs", "task run counter", taskGeneralLabels, nil),
-	descriptorKeyProbeData:     prometheus.NewDesc(probeDataName, probeDataHelpDescr, probeDataGeneralLabels, nil),
-	descriptorKeyProbeDataItem: prometheus.NewDesc(probeDataItemName, probeDataHelpDescr, probeDateItemGeneralLabels, nil),
+// probe metrics struct
+type metricData struct {
+	valueType   prometheus.ValueType
+	value       float64
+	labels      []string
+	constLabels prometheus.Labels
 }
 
-// probe metrics struct
-type probeDataMetric struct {
-	valueType prometheus.ValueType
-	value     float64
-	labels    []string
+type metricDescriptorInfo struct {
+	name   string
+	help   string
+	labels []string
 }
+
+var metricBaseDescriptors = map[string]metricDescriptorInfo{
+	pNameScriptResult: {
+		pNameScriptResult, "script execution result", LabelsScriptGeneral,
+	},
+	pNameTaskResult: {
+		pNameTaskResult, "task execution result", LabelsTaskGeneral,
+	},
+	pNameTaskRuntime: {
+		pNameTaskRuntime, "task runtime", LabelsTaskGeneral,
+	},
+	pNameTaskRuns: {
+		pNameTaskRuns, "task run counter", LabelsTaskGeneral,
+	},
+	pNameData: {
+		pNameData, probeDataHelpDescr, LabelsProbeDataGeneral,
+	},
+	pNameDataItem: {
+		pNameDataItem, probeDataHelpDescr, LabelsProbeDateItemGeneral,
+	},
+}
+
+// prometheus metrics descriptors
+var pDescriptors = map[string]*prometheus.Desc{}
 
 // Describe - implementation of prometheus.Collector interface
 func (s *Scheduler) Describe(chan<- *prometheus.Desc) {
@@ -51,82 +75,65 @@ func (s *Scheduler) Collect(ch chan<- prometheus.Metric) {
 	defer s.Unlock()
 	for _, j := range s.jobs {
 		scriptResult := j.Script.ResultFinished()
-		ch <- prometheus.MustNewConstMetric(
-			pDescriptors["script_result"],
-			prometheus.GaugeValue, gbValue(scriptResult.Success),
-			j.Name, j.ScriptFile,
+		s.sendMetric(ch, []string{pNameScriptResult},
+			metricData{prometheus.GaugeValue, gbValue(scriptResult.Success), []string{j.Name, j.ScriptFile}, nil},
 		)
 		for _, t := range scriptResult.Tasks {
 			// task general metrics
 			taskMetricLabelValues := []string{j.Name, j.ScriptFile, t.Name}
-			ch <- prometheus.MustNewConstMetric(
-				pDescriptors["task_result"],
-				prometheus.GaugeValue, gbValue(t.Success),
-				taskMetricLabelValues...,
-			)
-			ch <- prometheus.MustNewConstMetric(
-				pDescriptors["task_runtime"],
-				prometheus.GaugeValue, float64(t.RuntimeMs),
-				taskMetricLabelValues...,
-			)
-			ch <- prometheus.MustNewConstMetric(
-				pDescriptors["task_runs"],
-				prometheus.CounterValue, float64(t.RunCounter),
-				taskMetricLabelValues...,
-			)
+
+			// check if there are additional metric labels for this task
+			var taskMetric model.TaskMetric
+			for _, task := range j.Script.Tasks {
+				if task.Name == t.Name {
+					taskMetric = task.Metric
+					break
+				}
+			}
+			s.sendMetric(
+				ch, []string{pNameTaskResult},
+				metricData{prometheus.GaugeValue, gbValue(t.Success), taskMetricLabelValues, taskMetric.Labels.Data()})
+			s.sendMetric(
+				ch, []string{pNameTaskRuntime},
+				metricData{prometheus.GaugeValue, float64(t.RuntimeMs), taskMetricLabelValues, taskMetric.Labels.Data()})
+			s.sendMetric(
+				ch, []string{pNameTaskRuns},
+				metricData{prometheus.CounterValue, float64(t.RunCounter), taskMetricLabelValues, taskMetric.Labels.Data()})
+
 			// task data metrics
 			if t.Probe.Data != nil {
-				// check if there are additional metric labels for this task
-				var taskLabels model.MetricLabels
-				for _, task := range j.Script.Tasks {
-					if task.Name == t.Name {
-						taskLabels = task.MetricLabels
-						break
-					}
-				}
-				if !taskLabels.IsEmpty() {
-
-				}
+				// add probe name to metric labels
 				dataMetricLabelValues := taskMetricLabelValues[:]
 				dataMetricLabelValues = append(dataMetricLabelValues, t.Probe.Name)
 				ms := probeMetrics(t.Probe.Data)
 				for _, m := range ms {
 					var (
 						labelValues    []string
-						pDescriptorKey string
+						pDescriptorKey []string
 					)
 					if len(m.labels) == 0 {
 						labelValues = dataMetricLabelValues
-						pDescriptorKey = descriptorKeyProbeData
+						pDescriptorKey = []string{pNameData}
 					} else {
 						labelValues = dataMetricLabelValues[:]
-						labelValues = append(labelValues, m.labels...)
-						pDescriptorKey = descriptorKeyProbeDataItem
-					}
-					// has dynamic labels
-					if !taskLabels.IsEmpty() {
-						descriptorKey := strings.Join(taskMetricLabelValues, "|")
-						if _, exists := pDescriptors[descriptorKey]; !exists {
-							var (
-								labels []string
-								name   string
-							)
-
-							switch pDescriptorKey {
-							case descriptorKeyProbeData:
-								labels = probeDataGeneralLabels
-								name = probeDataName
-							case descriptorKeyProbeDataItem:
-								labels = probeDateItemGeneralLabels
-								name = probeDataItemName
+						if len(taskMetric.ValueMap) > 0 {
+							val, ok := taskMetric.ValueMap[m.labels[0]]
+							if ok {
+								m.labels[0] = val
 							}
-
-							pDescriptors[descriptorKey] =
-								prometheus.NewDesc(name, probeDataHelpDescr, labels, taskLabels.Data())
 						}
-						pDescriptorKey = descriptorKey
+						labelValues = append(labelValues, m.labels...)
+						pDescriptorKey = []string{pNameDataItem}
 					}
-					ch <- prometheus.MustNewConstMetric(pDescriptors[pDescriptorKey], m.valueType, m.value, labelValues...)
+					// if task has custom labels
+					if !taskMetric.Labels.IsEmpty() {
+						pDescriptorKey = append(pDescriptorKey, taskMetricLabelValues...)
+					}
+					s.sendMetric(
+						ch, pDescriptorKey,
+						metricData{
+							valueType: m.valueType, value: m.value, labels: labelValues, constLabels: taskMetric.Labels.Data(),
+						})
 				}
 			}
 		}
@@ -139,6 +146,50 @@ func gbValue(v bool) float64 {
 		return 1
 	}
 	return 0
+}
+
+func (s *Scheduler) sendMetric(ch chan<- prometheus.Metric, descrCompositeKey []string, metricData metricData) {
+
+	var (
+		descrKey string
+		pDescr   *prometheus.Desc
+		ok       bool
+	)
+
+	// metric descriptor key is a concatenation of base metric descriptor key and task labels
+	if len(descrCompositeKey) == 1 && len(metricData.constLabels) > 0 {
+		descrCompositeKey = append(descrCompositeKey, metricData.labels...)
+	}
+
+	if len(descrCompositeKey) == 1 {
+		descrKey = descrCompositeKey[0]
+	} else {
+		descrKey = strings.Join(descrCompositeKey, "|")
+	}
+
+	// check if metric descriptor already exists
+	pDescr, ok = pDescriptors[descrKey]
+	if !ok { // metric descriptor not found, create it
+		descrInfo, ok := metricBaseDescriptors[descrKey]
+		if ok {
+			pDescr = prometheus.NewDesc(descrKey, descrInfo.help, descrInfo.labels, metricData.constLabels)
+			pDescriptors[descrKey] = pDescr
+		} else {
+			descrInfo, ok = metricBaseDescriptors[descrCompositeKey[0]]
+			if !ok {
+				s.logger.Printf("unknown base metric descriptor: %s", descrCompositeKey[0])
+				return
+			}
+			pDescr =
+				prometheus.NewDesc(descrCompositeKey[0], descrInfo.help, descrInfo.labels, metricData.constLabels)
+			pDescriptors[descrKey] = pDescr
+		}
+	}
+	ch <- prometheus.MustNewConstMetric(
+		pDescr,
+		metricData.valueType, metricData.value,
+		metricData.labels...,
+	)
 }
 
 func addToArray(arr []string, s string) []string {
@@ -160,7 +211,7 @@ func reflectIsFloat(kind reflect.Kind) bool {
 // data can be a simple value or hash of names and values
 //
 //nolint:funlen
-func probeMetrics(data any) (metrics []probeDataMetric) {
+func probeMetrics(data any) (metrics []metricData) {
 	var (
 		valueType = prometheus.GaugeValue
 		labels    []string
@@ -203,7 +254,7 @@ func probeMetrics(data any) (metrics []probeDataMetric) {
 				continue
 			}
 
-			metrics = append(metrics, probeDataMetric{
+			metrics = append(metrics, metricData{
 				valueType: valueType,
 				value:     value,
 				labels:    labels,
@@ -225,7 +276,7 @@ func probeMetrics(data any) (metrics []probeDataMetric) {
 		labels = []string{v.String()}
 	}
 
-	return []probeDataMetric{
+	return []metricData{
 		{
 			valueType: valueType,
 			value:     value,
