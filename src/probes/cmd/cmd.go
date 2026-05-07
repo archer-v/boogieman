@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/go-cmd/cmd"
 	"log"
+	"strings"
 	"time"
 )
 
@@ -132,9 +133,26 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 	if finished.Exit != c.ExitCode {
 		err = fmt.Errorf("wrong exit code %v", finished.Exit)
 	}
-	succ = finished.Exit == c.ExitCode == c.Expect
+	stdoutMatch := c.checkStdout(finished.Stdout)
+	if finished.Exit == c.ExitCode && !stdoutMatch {
+		if c.StdoutRegexInvert {
+			err = fmt.Errorf("stdout matches forbidden regex")
+		} else {
+			err = fmt.Errorf("stdout doesn't match regex")
+		}
+	}
+	succ = (finished.Exit == c.ExitCode && stdoutMatch) == c.Expect
 	resultObject = finished.Exit
 	return
+}
+
+func (c *Probe) checkStdout(stdout []string) bool {
+	if c.stdoutRegexp == nil {
+		return true
+	}
+
+	matched := c.stdoutRegexp.MatchString(strings.Join(stdout, "\n"))
+	return matched != c.StdoutRegexInvert
 }
 
 func (c *Probe) Finisher(context.Context) {

@@ -235,9 +235,13 @@ probe:
     cmd: ping -c 3 -i 0.1 -W 0.1 127.0.0.1
     exitCode: 0
     logDump: false
+    stdoutRegex: "bytes from"
+    stdoutRegexInvert: false
 ```
 
 `stayBackground: true` means the command is expected to keep running after the startup timeout. If it exits earlier, the probe fails.
+
+If `stdoutRegex` is set, the probe checks the command stdout after the command exits and the exit code matches. With `stdoutRegexInvert: false`, the probe succeeds only when stdout matches the expression. With `stdoutRegexInvert: true`, the probe succeeds only when stdout does not match.
 
 ### openvpn
 

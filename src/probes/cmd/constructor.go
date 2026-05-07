@@ -47,6 +47,10 @@ func (c constructor) configuration(conf any) (config Config, err error) {
 		err = model.ErrorConfig
 		return
 	}
+	if err = config.compileStdoutRegex(); err != nil {
+		return
+	}
+
 	// if no Args, config.Cmd can contain 'shell-like' command string, parse it
 	if len(config.Args) == 0 {
 		if err = config.initWithString(config.Cmd); err != nil {

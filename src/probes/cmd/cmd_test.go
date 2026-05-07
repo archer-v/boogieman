@@ -136,3 +136,103 @@ func Test_Runner(t *testing.T) {
 		log.Printf("[%v] OK", testId)
 	}
 }
+
+func Test_RunnerStdoutRegex(t *testing.T) {
+	defOptions := model.ProbeOptions{Timeout: time.Millisecond * 1000, Expect: true}
+	constructor := constructor{
+		probefactory.BaseConstructor{
+			Name: name,
+		},
+	}
+
+	type testCase struct {
+		name           string
+		config         Config
+		expectedResult bool
+	}
+
+	cases := []testCase{
+		{
+			name: "stdout regex matches",
+			config: Config{
+				Cmd:         "sh",
+				Args:        []string{"-c", "printf 'service version: 1.2.3\\nstatus: ok\\n'"},
+				StdoutRegex: `version:\s+\d+\.\d+\.\d+`,
+			},
+			expectedResult: true,
+		},
+		{
+			name: "stdout regex does not match",
+			config: Config{
+				Cmd:         "sh",
+				Args:        []string{"-c", "printf 'service version: 1.2.3\\nstatus: ok\\n'"},
+				StdoutRegex: `maintenance`,
+			},
+			expectedResult: false,
+		},
+		{
+			name: "inverted stdout regex fails on match",
+			config: Config{
+				Cmd:               "sh",
+				Args:              []string{"-c", "printf 'service version: 1.2.3\\nstatus: ok\\n'"},
+				StdoutRegex:       `status:\s+ok`,
+				StdoutRegexInvert: true,
+			},
+			expectedResult: false,
+		},
+		{
+			name: "inverted stdout regex succeeds without match",
+			config: Config{
+				Cmd:               "sh",
+				Args:              []string{"-c", "printf 'service version: 1.2.3\\nstatus: ok\\n'"},
+				StdoutRegex:       `maintenance`,
+				StdoutRegexInvert: true,
+			},
+			expectedResult: true,
+		},
+		{
+			name: "exit code mismatch still fails",
+			config: Config{
+				Cmd:         "sh",
+				Args:        []string{"-c", "printf 'service version: 1.2.3\\n'; exit 7"},
+				ExitCode:    0,
+				StdoutRegex: `version`,
+			},
+			expectedResult: false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			p, err := constructor.NewProbe(defOptions, c.config)
+			if err != nil {
+				t.Fatalf("constructor returned error: %v", err)
+			}
+			ctx := model.ContextWithLogger(context.Background(), model.NewChainLogger(model.DefaultLogger, c.name))
+			if p.Start(ctx) != c.expectedResult {
+				t.Fatalf("probe should return %v", c.expectedResult)
+			}
+			p.Finish(ctx)
+		})
+	}
+}
+
+func Test_ConstructorWrongStdoutRegex(t *testing.T) {
+	constructor := constructor{
+		probefactory.BaseConstructor{
+			Name: name,
+		},
+	}
+
+	_, err := constructor.NewProbe(
+		model.ProbeOptions{Timeout: time.Millisecond * 1000, Expect: true},
+		Config{
+			Cmd:         "sh",
+			Args:        []string{"-c", "printf test"},
+			StdoutRegex: "[",
+		},
+	)
+	if err == nil {
+		t.Fatal("constructor should return an error for invalid stdoutRegex")
+	}
+}
