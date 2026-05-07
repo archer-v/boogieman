@@ -21,6 +21,7 @@ type Probe struct {
 type Config struct {
 	HTTPStatus int `default:"200"`
 	Urls       []string
+	FWMark     int `json:"fwMark,omitempty"`
 }
 
 var name = "web"
@@ -45,6 +46,7 @@ func New(options model.ProbeOptions, config Config) *Probe {
 func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 	var timings model.Timings
 	var wg sync.WaitGroup
+	var mutex sync.Mutex
 	done := 0
 	for _, s := range c.Urls {
 		if u, e := url.Parse(s); e != nil {
@@ -67,12 +69,16 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 				if err != nil {
 					c.Log("[%v] %v, %vms", s, err, dur.Milliseconds())
 					if !c.Expect {
+						mutex.Lock()
 						done++
+						mutex.Unlock()
 					}
 				} else {
 					timings.Set(s, dur)
 					if c.Expect {
+						mutex.Lock()
 						done++
+						mutex.Unlock()
 					}
 					c.Log("[%v] OK, %vms", s, dur.Milliseconds())
 				}
@@ -82,7 +88,7 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 				wg.Done()
 			}()
 
-			client := http.Client{Timeout: c.Timeout}
+			client := c.httpClient()
 			r, err = client.Get(s)
 			if err != nil {
 				if strings.Contains(err.Error(), "context deadline exceeded") {
@@ -102,4 +108,8 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 	succ = done == len(c.Urls)
 	resultObject = timings.TimingsMs()
 	return
+}
+
+func (c *Probe) httpClient() http.Client {
+	return newHTTPClient(c.Timeout, c.FWMark)
 }

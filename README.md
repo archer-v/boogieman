@@ -1,84 +1,118 @@
 # boogieman
-The probing utility, is designed to monitor the availability of host nodes, networks, services, and processes. It serves as a lightweight and straightforward tool, ideal for integration into automation scripts or as a metrics provider in various DevOps and network operations. All probes within this utility expose their data as Prometheus metrics or a JSON formatted object exposed at a http port, making it a reliable source for availability metrics related to hosts, networks, routes, and network services.
 
-The utility can perform single or composite checks combined in a scenario described in configuration file in a YAML format. Checks can be executed in parallel, so an entire scenario can execute quickly.
+Boogieman is a lightweight Go utility for probing the availability of hosts, networks, routes, HTTP services, OpenVPN tunnels, and local processes. It can run a single check, execute a YAML scenario, or work as a daemon that exposes the latest results as JSON and Prometheus metrics.
 
-### Available checks (probes): 
-- ping
-- web (GET request with response code checking) 
-- openvpn
-- cmd (arbitrary console command with exit code checking)
-- traceroute (with checking of presense of a particular host in a traceroute)
-- any additional probes can be created
+## Features
 
-All probes can returns additional data, like timings, response codes, stdout, etc
+- Single-probe and multi-step scenario execution.
+- Parallel execution of tasks that belong to the same `cgroup`.
+- Console output or JSON output for one-shot runs.
+- Daemon mode with scheduled jobs.
+- HTTP API for the latest job results.
+- Prometheus metrics for script, task, runtime, run counter, and probe data values.
+- Extensible probe registry for adding custom probes.
 
-### Working modes
-- console mode: performs single scenario or probe run with text or JSON formatted output to stdout
-- continuos (daemon) monitoring mode: performs regular checks and exposes the results as prometheus metrics or a json formatted string
-```
-./boogieman
-boogieman - version: devel-main-b61f6e4, build: 2023-12-12_210008
+## Available probes
 
-  Usage:
-    boogieman [oneRun|daemon]
+- `ping` - checks host reachability and returns response timings.
+- `web` - sends HTTP GET requests and checks the expected status code.
+- `cmd` - starts a local command and checks its exit code.
+- `openvpn` - starts an OpenVPN client and waits for successful initialization.
+- `traceroute` - runs traceroute and checks whether expected hops are present or absent.
 
-  Subcommands: 
-    oneRun   performs a single run, print result and exit
-    daemon   start in daemon mode and performs scheduled jobs
+## Build
 
-  Flags: 
-       --version   Displays the program version string.
-    -h --help      Displays help with available flag, subcommand, and positional value parameters.
+Requirements:
 
-```
-#### Console mode
+- Go 1.21 or newer.
+- Linux target for the default `make build`.
+- `openvpn` for OpenVPN checks and related tests.
+- Root privileges or `cap_net_raw` for `ping` and `traceroute` checks.
 
-Use **oneRun** command option to execute the particular probe or script. The result is output to a console as a plain text or json formatted string. Also a utility is finished with exit code 0 on success checks execution.
+Common commands:
 
-For example:
- * `./boogieman oneRun --script test/script-simple.yml -J` will execute the test/script-simple.yml script and output the result to the console in JSON format
- * `./boogieman oneRun --probe ping -c msn.com,github.com` will perform ping of two hosts msn.com,github.com and output the result to the console.
-
-Run options: 
-```
-./boogieman oneRun
-oneRun - performs a single run, print result and exit
-
-  Flags: 
-       --version   Displays the program version string.
-    -h --help      Displays help with available flag, subcommand, and positional value parameters.
-    -s --script    path to a script file in yml format
-    -p --probe     single probe to start (ignored if script option is selected)
-    -c --config    probe configuration string (ignored if script option is selected)
-    -t --timeout   probe waiting timeout (ignored if script option is selected) (default: 0s)
-    -d --debug     debug logging
-    -v --verbose   verbose logging
-    -e --expect    expected result true|false (ignored if script option is selected) (default: true)
-    -j --json      output result in JSON format
-    -J --jsonp     output result in JSON format with indents and CR
+```bash
+make dep
+make build
+make test
+make distro
 ```
 
-#### Daemon mode
+`make build` creates `build/boogieman`. The default Makefile build is a static Linux build; set `GOARCH` if you need a specific architecture.
 
-`./boogieman daemon --config test/boogieman.yml` will start the service in a daemon mode with configuration read from test/boogieman.yml. 
+## Usage
 
-Configuration file contains global options, list of jobs (scripts) and a schedule of their execution. HTTP server is listen at the tcp port (default 9091) and exposes scripts execution result as a prometheus metrics and json format text.
+```text
+boogieman [oneRun|daemon]
 
-Available http endpoints:
-
-* /job?name=job_name - returns JSON object with result of a last job execution
-* /jobs - returns a job list in a schedule queue
-* /metrics - prometheus metrics
-
-### Concurrent task execution and timeouts
-
-Several probes in a script can be configured to execute simultaneously so an entire scenario can execute quickly. Configurable timeouts are supported for all checks. Use cgroup option with the same value to define concurrent group.
-
-### Configuration examples
-
-**Script file:**
+Subcommands:
+  oneRun   performs a single run, prints the result, and exits
+  daemon   starts daemon mode and performs scheduled jobs
 ```
+
+### One-shot mode
+
+Use `oneRun` to execute either a YAML script or one probe passed through the CLI.
+
+Examples:
+
+```bash
+./boogieman oneRun --script test/script-simple.yml -J
+./boogieman oneRun --probe ping --config msn.com,github.com
+./boogieman oneRun --probe web --config https://example.com --timeout 2s --json
+```
+
+Options:
+
+```text
+-s, --script    path to a script file in YAML format
+-p, --probe     single probe to start; ignored when --script is used
+-c, --config    probe configuration string; ignored when --script is used
+-t, --timeout   probe timeout; ignored when --script is used
+-d, --debug     debug logging
+-v, --verbose   verbose logging
+-e, --expect    expected result flag; ignored when --script is used
+-j, --json      compact JSON output
+-J, --jsonp     pretty JSON output
+```
+
+Exit codes:
+
+- `0` - check succeeded.
+- `1` - check ran but returned an unsuccessful result.
+- `2` - startup or configuration error.
+
+### Daemon mode
+
+Daemon mode reads a YAML configuration with global options and scheduled jobs.
+
+```bash
+./boogieman daemon --config test/boogieman.yml
+```
+
+The HTTP server listens on `global.bind_to`; the default is `localhost:9091`.
+
+Endpoints:
+
+- `/job?name=<job_name>` - latest finished result for a job.
+- `/jobs` - configured jobs and their next start time.
+- `/metrics` - Prometheus metrics.
+
+Schedules can be either Go duration strings such as `60s` or cron expressions with seconds such as `10 * * * * *`.
+
+## Scenario execution
+
+A script is a sequence of tasks. Each task wraps one probe.
+
+Tasks with the same `cgroup` value are executed in parallel. Groups are executed sequentially in the order they appear in the script. If `cgroup` is omitted, Boogieman assigns an internal group automatically.
+
+Probe option `timeout` in YAML is expressed in milliseconds.
+
+## Configuration examples
+
+### Script file
+
+```yaml
 script:
   - name: gateway-alive
     cgroup: 1
@@ -87,10 +121,16 @@ script:
       options:
         timeout: 100
       configuration:
-        # localhost just for an example
         hosts:
           - 127.0.0.1
           - 127.0.0.2
+    metric:
+      labels:
+        environment: test
+      valueMap:
+        127.0.0.1: host1
+        127.0.0.2: host2
+
   - name: internet-alive
     cgroup: 1
     probe:
@@ -102,11 +142,11 @@ script:
           - https://google.com/
           - https://github.com/
         httpStatus: 200
+
   - name: backup-gateway-disabled
     probe:
       name: ping
       options:
-        # 192.168.105.105 host shouldn't ping
         expect: false
         timeout: 200
       configuration:
@@ -114,24 +154,23 @@ script:
           - 192.168.105.105
 ```
 
-**Daemon configuration file:**
-```
+### Daemon configuration
+
+```yaml
 global:
-  # default schedule for the job if it's not defined 
   default_schedule: 60s
-  # bind the service to the interface:port
   bind_to: localhost:9091
-  # service exit if any of the config files have been modified; 
-  # this is useful for automatically restarting the service by systemd when the configuration changes
   exit_on_config_change: true
+
 jobs:
   - script: test/script-openvpn.yml
     name: TestJob1
-    schedule: 10 * * * * * #sec, min, hour, day, month, day of week
+    schedule: 10 * * * * *
     timeout: 30000
     vars:
       vpn-connect:
-        remote_host: 127.0.0.3
+        configFile: src/probes/openvpn/test/openvpn-client.ovpn
+
   - script: test/script-simple.yml
     name: TestJob2
     timeout: 10000
@@ -142,154 +181,188 @@ jobs:
         urls: https://msn.com/
 ```
 
-### Example of responses 
+`vars` can override probe configuration fields by task name. Values are parsed as strings and converted to the target field type where supported.
 
-http /job endpoint response example:
+## Probe configuration reference
+
+### ping
+
+```yaml
+probe:
+  name: ping
+  options:
+    timeout: 1000
+    expect: true
+  configuration:
+    hosts:
+      - 127.0.0.1
+    interval: 500
 ```
+
+`interval` is in milliseconds. The probe returns a map of host names to response times in milliseconds.
+
+### web
+
+```yaml
+probe:
+  name: web
+  options:
+    timeout: 1500
+  configuration:
+    urls:
+      - https://example.com/
+    httpStatus: 200
+    fwMark: 100
+```
+
+URLs without a scheme are treated as HTTPS URLs.
+
+On Linux, `fwMark` sets `SO_MARK` on sockets opened by the web probe. This can be used with `ip rule` and policy routing. On non-Linux systems, `fwMark` is ignored and the probe uses the regular HTTP client behavior.
+
+### cmd
+
+```yaml
+probe:
+  name: cmd
+  options:
+    timeout: 500
+    stayBackground: false
+  configuration:
+    cmd: ping -c 3 -i 0.1 -W 0.1 127.0.0.1
+    exitCode: 0
+    logDump: false
+```
+
+`stayBackground: true` means the command is expected to keep running after the startup timeout. If it exits earlier, the probe fails.
+
+### openvpn
+
+```yaml
+probe:
+  name: openvpn
+  options:
+    timeout: 5000
+    stayBackground: true
+  configuration:
+    configFile: src/probes/openvpn/test/openvpn-client.ovpn
+    logDump: false
+```
+
+Use `configData` instead of `configFile` to pass OpenVPN configuration content directly.
+
+### traceroute
+
+```yaml
+probe:
+  name: traceroute
+  options:
+    timeout: 2000
+  configuration:
+    host: 8.8.8.8
+    expectedHops:
+      - 8.8.8.8
+    expectedMatch: any
+    maxHops: 30
+    retries: 2
+```
+
+`expectedMatch` supports `any`, `all`, and `none`.
+
+## Response examples
+
+### `/job`
+
+```json
 {
-   "result":{
-      "startedAt":"2023-12-01T00:37:08.208525151+05:00",
-      "runtime":799,
-      "success":true,
-      "runCounter":174
-   },
-   "status":"finished",
-   "tasks":[
-      {
-         "name":"gateway-alive",
-         "status":"finished",
-         "probe":{
-            "name":"ping",
-            "options":{
-               "timeout":100,
-               "expect":true
-            },
-            "startedAt":"2023-12-01T00:37:08.208614247+05:00",
-            "runtime":0,
-            "success":true,
-            "runCounter":174,
-            "data":{
-               "127.0.0.1":2,
-               "127.0.0.2":4
-            }
-         },
-         "startedAt":"2023-12-01T00:37:08.208610199+05:00",
-         "runtime":4,
-         "success":true,
-         "runCounter":174
+  "result": {
+    "startedAt": "2023-12-01T00:37:08.208525151+05:00",
+    "runtime": 799,
+    "success": true,
+    "runCounter": 174
+  },
+  "status": "finished",
+  "tasks": [
+    {
+      "name": "gateway-alive",
+      "status": "finished",
+      "probe": {
+        "name": "ping",
+        "options": {
+          "timeout": 100,
+          "expect": true
+        },
+        "runtime": 4,
+        "success": true,
+        "runCounter": 174,
+        "data": {
+          "127.0.0.1": 2,
+          "127.0.0.2": 4
+        }
       },
-      {
-         "name":"internet-alive",
-         "status":"finished",
-         "probe":{
-            "name":"web",
-            "options":{
-               "timeout":1500,
-               "expect":true
-            },
-            "startedAt":"2023-12-01T00:37:08.208537003+05:00",
-            "runtime":558,
-            "success":true,
-            "runCounter":174,
-            "data":{
-               "https://github.com/":84,
-               "https://google.com/":558
-            }
-         },
-         "startedAt":"2023-12-01T00:37:08.20853557+05:00",
-         "runtime":558,
-         "success":true,
-         "runCounter":174
-      },
-      {
-         "name":"backup-gateway-disabled",
-         "status":"finished",
-         "probe":{
-            "name":"ping",
-            "options":{
-               "timeout":200,
-               "expect":false
-            },
-            "startedAt":"2023-12-01T00:37:08.767422984+05:00",
-            "runtime":240,
-            "success":true,
-            "runCounter":174,
-            "data":{
-               
-            }
-         },
-         "startedAt":"2023-12-01T00:37:08.767421631+05:00",
-         "runtime":240,
-         "success":true,
-         "runCounter":174
-      }
-   ]
+      "runtime": 4,
+      "success": true,
+      "runCounter": 174
+    }
+  ]
 }
 ```
 
-http /jobs endpoint response example:
-```
+### `/jobs`
+
+```json
 [
-   {
-      "name":"TestJob1",
-      "script":"test/script-openvpn.yml",
-      "schedule":"10 * * * * *",
-      "once":false,
-      "timeout":30000,
-      "nextStartAt":"2023-11-30T22:33:10+05:00"
-   },
-   {
-      "name":"TestJob2",
-      "script":"test/script-simple.yml",
-      "schedule":"60s",
-      "once":false,
-      "timeout":10000,
-      "nextStartAt":"2023-11-30T22:33:08.180271936+05:00"
-   }
+  {
+    "name": "TestJob2",
+    "script": "test/script-simple.yml",
+    "schedule": "60s",
+    "once": false,
+    "timeout": 10000,
+    "nextStartAt": "2023-11-30T22:33:08.180271936+05:00"
+  }
 ]
 ```
 
-http /metrics response example (prometheus metrics)
-```
+### `/metrics`
+
+```text
 # HELP boogieman_probe_data_item probe execution data result
 # TYPE boogieman_probe_data_item gauge
 boogieman_probe_data_item{item="127.0.0.3",job="TestJob2",probe="ping",script="test/script-simple.yml",task="gateway-alive"} 0
-boogieman_probe_data_item{item="127.0.0.4",job="TestJob2",probe="ping",script="test/script-simple.yml",task="gateway-alive"} 2
 boogieman_probe_data_item{item="https://msn.com/",job="TestJob2",probe="web",script="test/script-simple.yml",task="internet-alive"} 1237
+
 # HELP boogieman_script_result script execution result
 # TYPE boogieman_script_result gauge
-boogieman_script_result{job="TestJob1",script="test/script-openvpn.yml"} 0
 boogieman_script_result{job="TestJob2",script="test/script-simple.yml"} 1
+
 # HELP boogieman_task_result task execution result
 # TYPE boogieman_task_result gauge
-boogieman_task_result{job="TestJob1",script="test/script-openvpn.yml",task="gateway-alive"} 0
-boogieman_task_result{job="TestJob1",script="test/script-openvpn.yml",task="tunnel-network-routing"} 0
-boogieman_task_result{job="TestJob1",script="test/script-openvpn.yml",task="vpn-connect"} 0
-boogieman_task_result{job="TestJob1",script="test/script-openvpn.yml",task="vpn-tunnel-alive"} 0
-boogieman_task_result{job="TestJob2",script="test/script-simple.yml",task="backup-gateway-disabled"} 1
 boogieman_task_result{job="TestJob2",script="test/script-simple.yml",task="gateway-alive"} 1
-boogieman_task_result{job="TestJob2",script="test/script-simple.yml",task="internet-alive"} 1
-# HELP boogieman_task_runs task run counter
-# TYPE boogieman_task_runs counter
-boogieman_task_runs{job="TestJob1",script="test/script-openvpn.yml",task="gateway-alive"} 0
-boogieman_task_runs{job="TestJob1",script="test/script-openvpn.yml",task="tunnel-network-routing"} 0
-boogieman_task_runs{job="TestJob1",script="test/script-openvpn.yml",task="vpn-connect"} 0
-boogieman_task_runs{job="TestJob1",script="test/script-openvpn.yml",task="vpn-tunnel-alive"} 0
-boogieman_task_runs{job="TestJob2",script="test/script-simple.yml",task="backup-gateway-disabled"} 1
-boogieman_task_runs{job="TestJob2",script="test/script-simple.yml",task="gateway-alive"} 1
-boogieman_task_runs{job="TestJob2",script="test/script-simple.yml",task="internet-alive"} 1
+
 # HELP boogieman_task_runtime task runtime
 # TYPE boogieman_task_runtime gauge
-boogieman_task_runtime{job="TestJob1",script="test/script-openvpn.yml",task="gateway-alive"} 0
-boogieman_task_runtime{job="TestJob1",script="test/script-openvpn.yml",task="tunnel-network-routing"} 0
-boogieman_task_runtime{job="TestJob1",script="test/script-openvpn.yml",task="vpn-connect"} 0
-boogieman_task_runtime{job="TestJob1",script="test/script-openvpn.yml",task="vpn-tunnel-alive"} 0
-boogieman_task_runtime{job="TestJob2",script="test/script-simple.yml",task="backup-gateway-disabled"} 253
-boogieman_task_runtime{job="TestJob2",script="test/script-simple.yml",task="gateway-alive"} 2
 boogieman_task_runtime{job="TestJob2",script="test/script-simple.yml",task="internet-alive"} 1237
-boogieman_task_runtime{job="TestJob3",script="test/script-cmd.yml",task="gateway-alive-cmd-ping"} 313
+
+# HELP boogieman_task_runs task run counter
+# TYPE boogieman_task_runs counter
+boogieman_task_runs{job="TestJob2",script="test/script-simple.yml",task="internet-alive"} 1
 ```
 
-### Note
+## Adding a probe
 
-RAW_SOCKETS are used to perform ping and traceroute checks. So, the command requires root privileges to perform this checks. You can use sudo, or grant permissions only for operation with a raw sockets by setting the SET_CAP_RAW flag on the executable file. Use setcap command: `setcap cap_net_raw+ep ./boogieman`
+To add a probe:
+
+1. Create a package under `src/probes/<name>`.
+2. Implement `model.Prober`, usually by embedding `model.ProbeHandler`.
+3. Implement a `probefactory.Constructor`.
+4. Register the constructor with `probefactory.RegisterProbe`.
+5. Add a blank import in `src/probes/probes.go`.
+
+## Notes
+
+`ping` and `traceroute` use raw sockets. Run Boogieman as root or grant the binary the required capability:
+
+```bash
+sudo setcap cap_net_raw+ep ./boogieman
+```
+
+Some tests depend on external network access, raw sockets, and OpenVPN. CI runs them with elevated privileges.
