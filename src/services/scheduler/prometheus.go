@@ -70,6 +70,8 @@ func (s *Scheduler) Describe(chan<- *prometheus.Desc) {
 
 // Collect - implementation of prometheus.Collector interface
 // invokes metrics from each job and tasks, prepares and send data to prometheus module
+//
+//nolint:funlen
 func (s *Scheduler) Collect(ch chan<- prometheus.Metric) {
 	s.Lock()
 	defer s.Unlock()
@@ -149,7 +151,6 @@ func gbValue(v bool) float64 {
 }
 
 func (s *Scheduler) sendMetric(ch chan<- prometheus.Metric, descrCompositeKey []string, metricData metricData) {
-
 	var (
 		descrKey string
 		pDescr   *prometheus.Desc
