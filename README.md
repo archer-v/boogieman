@@ -213,11 +213,15 @@ probe:
       - https://example.com/
     httpStatus: 200
     fwMark: 100
+    bodyRegex: "service version: [0-9]+\\.[0-9]+"
+    bodyRegexInvert: false
 ```
 
 URLs without a scheme are treated as HTTPS URLs.
 
 On Linux, `fwMark` sets `SO_MARK` on sockets opened by the web probe. This can be used with `ip rule` and policy routing. On non-Linux systems, `fwMark` is ignored and the probe uses the regular HTTP client behavior.
+
+If `bodyRegex` is set, the probe reads the response body and checks it against the regular expression after the HTTP status check succeeds. With `bodyRegexInvert: false`, the probe succeeds only when the expression matches. With `bodyRegexInvert: true`, the probe succeeds only when the expression does not match.
 
 ### cmd
 

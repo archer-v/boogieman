@@ -6,8 +6,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -19,9 +21,12 @@ type Probe struct {
 }
 
 type Config struct {
-	HTTPStatus int `default:"200"`
-	Urls       []string
-	FWMark     int `json:"fwMark,omitempty"`
+	HTTPStatus      int `default:"200"`
+	Urls            []string
+	FWMark          int    `json:"fwMark,omitempty"`
+	BodyRegex       string `json:"bodyRegex,omitempty"`
+	BodyRegexInvert bool   `json:"bodyRegexInvert,omitempty"`
+	bodyRegexp      *regexp.Regexp
 }
 
 var name = "web"
@@ -102,6 +107,7 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 				err = fmt.Errorf("wrong response %v", r.StatusCode)
 				return
 			}
+			err = c.checkBody(r)
 		}(s)
 	}
 	wg.Wait()
@@ -112,4 +118,24 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 
 func (c *Probe) httpClient() http.Client {
 	return newHTTPClient(c.Timeout, c.FWMark)
+}
+
+func (c *Probe) checkBody(r *http.Response) error {
+	if c.bodyRegexp == nil {
+		return nil
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return fmt.Errorf("can't read response body: %w", err)
+	}
+
+	matched := c.bodyRegexp.Match(body)
+	if matched == c.BodyRegexInvert {
+		if c.BodyRegexInvert {
+			return fmt.Errorf("body matches forbidden regex")
+		}
+		return fmt.Errorf("body doesn't match regex")
+	}
+	return nil
 }

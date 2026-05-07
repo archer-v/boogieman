@@ -3,6 +3,7 @@ package web
 import (
 	"boogieman/src/model"
 	"boogieman/src/probefactory"
+	"fmt"
 	"regexp"
 )
 
@@ -32,17 +33,34 @@ func (c constructor) configuration(conf any) (configuration Config, err error) {
 		return
 	}
 
-	if c, ok := conf.(*Config); ok {
-		return *c, nil
-	}
-
-	if str, ok := conf.(string); ok {
-		urls := regexp.MustCompile("\\s*,\\s*").Split(str, -1)
+	switch v := conf.(type) {
+	case *Config:
+		configuration = *v
+	case Config:
+		configuration = v
+	case string:
+		urls := regexp.MustCompile("\\s*,\\s*").Split(v, -1)
 		newConfig := c.NewProbeConfiguration().(*Config)
 		newConfig.Urls = urls
-		return *newConfig, nil
+		configuration = *newConfig
+	default:
+		err = model.ErrorConfig
+		return
 	}
 
-	err = model.ErrorConfig
+	err = configuration.compileBodyRegex()
 	return
+}
+
+func (c *Config) compileBodyRegex() error {
+	if c.BodyRegex == "" {
+		return nil
+	}
+
+	r, err := regexp.Compile(c.BodyRegex)
+	if err != nil {
+		return fmt.Errorf("wrong bodyRegex: %w", err)
+	}
+	c.bodyRegexp = r
+	return nil
 }
