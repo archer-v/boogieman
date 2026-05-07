@@ -2,10 +2,12 @@ package scheduler
 
 import (
 	"boogieman/src/model"
-	"github.com/prometheus/client_golang/prometheus"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -30,6 +32,7 @@ type metricData struct {
 	valueType   prometheus.ValueType
 	value       float64
 	labels      []string
+	labelNames  []string
 	constLabels prometheus.Labels
 }
 
@@ -78,7 +81,7 @@ func (s *Scheduler) Collect(ch chan<- prometheus.Metric) {
 	for _, j := range s.jobs {
 		scriptResult := j.Script.ResultFinished()
 		s.sendMetric(ch, []string{pNameScriptResult},
-			metricData{prometheus.GaugeValue, gbValue(scriptResult.Success), []string{j.Name, j.ScriptFile}, nil},
+			metricData{prometheus.GaugeValue, gbValue(scriptResult.Success), []string{j.Name, j.ScriptFile}, nil, nil},
 		)
 		for _, t := range scriptResult.Tasks {
 			// task general metrics
@@ -94,13 +97,13 @@ func (s *Scheduler) Collect(ch chan<- prometheus.Metric) {
 			}
 			s.sendMetric(
 				ch, []string{pNameTaskResult},
-				metricData{prometheus.GaugeValue, gbValue(t.Success), taskMetricLabelValues, taskMetric.Labels.Data()})
+				metricData{prometheus.GaugeValue, gbValue(t.Success), taskMetricLabelValues, nil, taskMetric.Labels.Data()})
 			s.sendMetric(
 				ch, []string{pNameTaskRuntime},
-				metricData{prometheus.GaugeValue, float64(t.RuntimeMs), taskMetricLabelValues, taskMetric.Labels.Data()})
+				metricData{prometheus.GaugeValue, float64(t.RuntimeMs), taskMetricLabelValues, nil, taskMetric.Labels.Data()})
 			s.sendMetric(
 				ch, []string{pNameTaskRuns},
-				metricData{prometheus.CounterValue, float64(t.RunCounter), taskMetricLabelValues, taskMetric.Labels.Data()})
+				metricData{prometheus.CounterValue, float64(t.RunCounter), taskMetricLabelValues, nil, taskMetric.Labels.Data()})
 
 			// task data metrics
 			if t.Probe.Data != nil {
@@ -119,13 +122,19 @@ func (s *Scheduler) Collect(ch chan<- prometheus.Metric) {
 					} else {
 						labelValues = dataMetricLabelValues[:]
 						if len(taskMetric.ValueMap) > 0 {
-							val, ok := taskMetric.ValueMap[m.labels[0]]
-							if ok {
-								m.labels[0] = val
+							for i, labelName := range m.labelNames {
+								if labelName != "item" {
+									continue
+								}
+								val, ok := taskMetric.ValueMap[m.labels[i]]
+								if ok {
+									m.labels[i] = val
+								}
+								break
 							}
 						}
 						labelValues = append(labelValues, m.labels...)
-						pDescriptorKey = []string{pNameDataItem}
+						pDescriptorKey = []string{pNameDataItem, strings.Join(m.labelNames, ",")}
 					}
 					// if task has custom labels
 					if !taskMetric.Labels.IsEmpty() {
@@ -134,7 +143,8 @@ func (s *Scheduler) Collect(ch chan<- prometheus.Metric) {
 					s.sendMetric(
 						ch, pDescriptorKey,
 						metricData{
-							valueType: m.valueType, value: m.value, labels: labelValues, constLabels: taskMetric.Labels.Data(),
+							valueType: m.valueType, value: m.value, labels: labelValues,
+							labelNames: m.labelNames, constLabels: taskMetric.Labels.Data(),
 						})
 				}
 			}
@@ -181,8 +191,12 @@ func (s *Scheduler) sendMetric(ch chan<- prometheus.Metric, descrCompositeKey []
 				s.logger.Printf("unknown base metric descriptor: %s", descrCompositeKey[0])
 				return
 			}
+			labels := descrInfo.labels
+			if descrCompositeKey[0] == pNameDataItem && len(metricData.labelNames) > 0 {
+				labels = append(append([]string{}, LabelsProbeDataGeneral...), metricData.labelNames...)
+			}
 			pDescr =
-				prometheus.NewDesc(descrCompositeKey[0], descrInfo.help, descrInfo.labels, metricData.constLabels)
+				prometheus.NewDesc(descrCompositeKey[0], descrInfo.help, labels, metricData.constLabels)
 			pDescriptors[descrKey] = pDescr
 		}
 	}
@@ -208,36 +222,58 @@ func reflectIsFloat(kind reflect.Kind) bool {
 	return kind == reflect.Float32 || kind == reflect.Float64
 }
 
+func reflectIsString(kind reflect.Kind) bool {
+	return kind == reflect.String
+}
+
 // probeMetrics returns a slice of probe metrics
 // data can be a simple value or hash of names and values
 //
 //nolint:funlen
 func probeMetrics(data any) (metrics []metricData) {
 	var (
-		valueType = prometheus.GaugeValue
-		labels    []string
-		value     float64
+		valueType  = prometheus.GaugeValue
+		labels     []string
+		labelNames []string
+		value      float64
 	)
 
 	v := reflect.ValueOf(data)
+	if !v.IsValid() {
+		return nil
+	}
 	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil
+		}
 		v = v.Elem()
 	}
 
 	kind := v.Kind()
 
+	if kind == reflect.Struct {
+		return probeStructMetrics(v)
+	}
+
 	// if data is a map
 	if kind == reflect.Map {
-		iter := v.MapRange()
 		stop := false
-		for iter.Next() && !stop {
-			k := iter.Key()
-			v := iter.Value()
+		keys := v.MapKeys()
+		sort.Slice(keys, func(i, j int) bool {
+			return mapKeyString(keys[i]) < mapKeyString(keys[j])
+		})
+		for _, k := range keys {
+			if stop {
+				break
+			}
+			v := v.MapIndex(k)
 			switch {
 			case reflectIsInt(k.Kind()):
 				labels = []string{strconv.Itoa(int(k.Int()))}
+				labelNames = []string{"item"}
 			case k.Kind() == reflect.String:
 				labels = []string{k.String()}
+				labelNames = []string{"item"}
 			default:
 				// unsupported type of map key
 				stop = true
@@ -249,6 +285,10 @@ func probeMetrics(data any) (metrics []metricData) {
 				value = float64(v.Int())
 			case reflectIsFloat(v.Kind()):
 				value = v.Float()
+			case reflectIsString(v.Kind()):
+				value = 1
+				labels = append(labels, v.String())
+				labelNames = append(labelNames, "value")
 			default:
 				// unsupported type of map value
 				stop = true
@@ -256,9 +296,10 @@ func probeMetrics(data any) (metrics []metricData) {
 			}
 
 			metrics = append(metrics, metricData{
-				valueType: valueType,
-				value:     value,
-				labels:    labels,
+				valueType:  valueType,
+				value:      value,
+				labels:     labels,
+				labelNames: labelNames,
 			})
 		}
 		return metrics
@@ -275,13 +316,137 @@ func probeMetrics(data any) (metrics []metricData) {
 	case kind == reflect.String:
 		value = 1
 		labels = []string{v.String()}
+		labelNames = []string{"item"}
 	}
 
 	return []metricData{
 		{
-			valueType: valueType,
-			value:     value,
-			labels:    labels,
+			valueType:  valueType,
+			value:      value,
+			labels:     labels,
+			labelNames: labelNames,
 		},
+	}
+}
+
+//nolint:funlen
+func probeStructMetrics(v reflect.Value) (metrics []metricData) {
+	t := v.Type()
+	for i := 0; i < v.NumField(); i++ {
+		field := t.Field(i)
+		if field.PkgPath != "" {
+			continue
+		}
+		fieldName := exportedFieldName(field)
+		if fieldName == "" {
+			continue
+		}
+		fv := v.Field(i)
+		if fv.Kind() == reflect.Ptr {
+			if fv.IsNil() {
+				continue
+			}
+			fv = fv.Elem()
+		}
+
+		if fv.Kind() == reflect.Map {
+			metrics = append(metrics, probeStructMapMetrics(fieldName, fv)...)
+			continue
+		}
+
+		m, ok := probeStructSimpleMetric(fieldName, fv)
+		if !ok {
+			continue
+		}
+		metrics = append(metrics, m)
+	}
+	return metrics
+}
+
+func probeStructMapMetrics(fieldName string, v reflect.Value) (metrics []metricData) {
+	if v.Type().Key().Kind() != reflect.String {
+		return nil
+	}
+
+	keys := v.MapKeys()
+	sort.Slice(keys, func(i, j int) bool {
+		return mapKeyString(keys[i]) < mapKeyString(keys[j])
+	})
+	for _, k := range keys {
+		value := v.MapIndex(k)
+		if value.Kind() == reflect.Ptr {
+			if value.IsNil() {
+				continue
+			}
+			value = value.Elem()
+		}
+
+		m := metricData{
+			valueType:  prometheus.GaugeValue,
+			labels:     []string{fieldName, k.String()},
+			labelNames: []string{"field", "item"},
+		}
+		switch {
+		case reflectIsInt(value.Kind()):
+			m.value = float64(value.Int())
+		case reflectIsFloat(value.Kind()):
+			m.value = value.Float()
+		case value.Kind() == reflect.Bool:
+			m.value = gbValue(value.Bool())
+		case value.Kind() == reflect.String:
+			m.value = 1
+			m.labels = append(m.labels, value.String())
+			m.labelNames = append(m.labelNames, "value")
+		default:
+			continue
+		}
+		metrics = append(metrics, m)
+	}
+	return metrics
+}
+
+func probeStructSimpleMetric(fieldName string, v reflect.Value) (metricData, bool) {
+	m := metricData{
+		valueType:  prometheus.GaugeValue,
+		labels:     []string{fieldName},
+		labelNames: []string{"field"},
+	}
+	switch {
+	case v.Kind() == reflect.Bool:
+		m.value = gbValue(v.Bool())
+	case reflectIsInt(v.Kind()):
+		m.value = float64(v.Int())
+	case reflectIsFloat(v.Kind()):
+		m.value = v.Float()
+	case v.Kind() == reflect.String:
+		m.value = 1
+		m.labels = append(m.labels, v.String())
+		m.labelNames = append(m.labelNames, "value")
+	default:
+		return metricData{}, false
+	}
+	return m, true
+}
+
+func mapKeyString(v reflect.Value) string {
+	switch {
+	case reflectIsInt(v.Kind()):
+		return strconv.Itoa(int(v.Int()))
+	case v.Kind() == reflect.String:
+		return v.String()
+	default:
+		return ""
+	}
+}
+
+func exportedFieldName(field reflect.StructField) string {
+	jsonName := strings.Split(field.Tag.Get("json"), ",")[0]
+	switch jsonName {
+	case "-":
+		return ""
+	case "":
+		return field.Name
+	default:
+		return jsonName
 	}
 }
