@@ -133,7 +133,7 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 	if finished.Exit != c.ExitCode {
 		err = fmt.Errorf("wrong exit code %v", finished.Exit)
 	}
-	stdoutMatch := c.checkStdout(finished.Stdout)
+	stdoutMatch, capture := c.checkStdout(finished.Stdout)
 	if finished.Exit == c.ExitCode && !stdoutMatch {
 		if c.StdoutRegexInvert {
 			err = fmt.Errorf("stdout matches forbidden regex")
@@ -143,16 +143,26 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 	}
 	succ = (finished.Exit == c.ExitCode && stdoutMatch) == c.Expect
 	resultObject = finished.Exit
+	if c.StdoutRegexCaptureGroup > 0 {
+		resultObject = ResultData{
+			ExitCode: finished.Exit,
+			Capture:  capture,
+		}
+	}
 	return
 }
 
-func (c *Probe) checkStdout(stdout []string) bool {
+func (c *Probe) checkStdout(stdout []string) (matched bool, capture string) {
 	if c.stdoutRegexp == nil {
-		return true
+		return true, ""
 	}
 
-	matched := c.stdoutRegexp.MatchString(strings.Join(stdout, "\n"))
-	return matched != c.StdoutRegexInvert
+	matches := c.stdoutRegexp.FindStringSubmatch(strings.Join(stdout, "\n"))
+	matched = len(matches) > 0
+	if matched && c.StdoutRegexCaptureGroup > 0 {
+		capture = matches[c.StdoutRegexCaptureGroup]
+	}
+	return matched != c.StdoutRegexInvert, capture
 }
 
 func (c *Probe) Finisher(context.Context) {

@@ -1,0 +1,39 @@
+script:
+  - name: web-body-regex-match
+    cgroup: 1
+    probe:
+      name: web
+      options:
+        timeout: 5000
+      configuration:
+        urls:
+          # base64 encoded: boogieman version=1.2.3 status=ok
+          - https://httpbin.org/base64/Ym9vZ2llbWFuIHZlcnNpb249MS4yLjMgc3RhdHVzPW9rCg==
+        httpStatus: 200
+        bodyRegex: "status=ok"
+
+  - name: web-body-regex-invert
+    cgroup: 1
+    probe:
+      name: web
+      options:
+        timeout: 5000
+      configuration:
+        urls:
+          - https://httpbin.org/base64/Ym9vZ2llbWFuIHZlcnNpb249MS4yLjMgc3RhdHVzPW9rCg==
+        httpStatus: 200
+        bodyRegex: "status=failed"
+        bodyRegexInvert: true
+
+  - name: web-body-regex-capture-version
+    cgroup: 1
+    probe:
+      name: web
+      options:
+        timeout: 5000
+      configuration:
+        urls:
+          - https://httpbin.org/base64/Ym9vZ2llbWFuIHZlcnNpb249MS4yLjMgc3RhdHVzPW9rCg==
+        httpStatus: 200
+        bodyRegex: "version=([0-9]+\\.[0-9]+\\.[0-9]+)"
+        bodyRegexCaptureGroup: 1

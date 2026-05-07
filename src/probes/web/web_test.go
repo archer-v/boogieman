@@ -155,3 +155,67 @@ func Test_ConstructorWrongBodyRegex(t *testing.T) {
 		t.Fatal("constructor should return an error for invalid bodyRegex")
 	}
 }
+
+func Test_RunnerBodyRegexCapture(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("service version: 1.2.3\nstatus: ok"))
+	}))
+	defer server.Close()
+
+	constructor := constructor{
+		probefactory.BaseConstructor{
+			Name: name,
+		},
+	}
+
+	p, err := constructor.NewProbe(
+		model.ProbeOptions{Timeout: time.Millisecond * 5000, Expect: true},
+		Config{
+			Urls:                  []string{server.URL},
+			HTTPStatus:            http.StatusOK,
+			BodyRegex:             `version:\s+(\d+\.\d+\.\d+)`,
+			BodyRegexCaptureGroup: 1,
+		},
+	)
+	if err != nil {
+		t.Fatalf("constructor returned error: %v", err)
+	}
+
+	ctx := model.ContextWithLogger(context.Background(), model.NewChainLogger(model.DefaultLogger, "body capture"))
+	if !p.Start(ctx) {
+		t.Fatal("probe should return true")
+	}
+
+	result := p.Result()
+	data, ok := result.Data.(ResultData)
+	if !ok {
+		t.Fatalf("probe data should be ResultData, got %T", result.Data)
+	}
+	if data.Captures[server.URL] != "1.2.3" {
+		t.Fatalf("capture should be %q, got %q", "1.2.3", data.Captures[server.URL])
+	}
+	if _, ok = data.Timings[server.URL]; !ok {
+		t.Fatal("timing should be exported")
+	}
+}
+
+func Test_ConstructorWrongBodyRegexCaptureGroup(t *testing.T) {
+	constructor := constructor{
+		probefactory.BaseConstructor{
+			Name: name,
+		},
+	}
+
+	_, err := constructor.NewProbe(
+		model.ProbeOptions{Timeout: time.Millisecond * 5000, Expect: true},
+		Config{
+			Urls:                  []string{"https://example.com/"},
+			HTTPStatus:            http.StatusOK,
+			BodyRegex:             `version:\s+(\d+)`,
+			BodyRegexCaptureGroup: 2,
+		},
+	)
+	if err == nil {
+		t.Fatal("constructor should return an error for invalid bodyRegexCaptureGroup")
+	}
+}

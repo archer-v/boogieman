@@ -236,3 +236,63 @@ func Test_ConstructorWrongStdoutRegex(t *testing.T) {
 		t.Fatal("constructor should return an error for invalid stdoutRegex")
 	}
 }
+
+func Test_RunnerStdoutRegexCapture(t *testing.T) {
+	constructor := constructor{
+		probefactory.BaseConstructor{
+			Name: name,
+		},
+	}
+
+	p, err := constructor.NewProbe(
+		model.ProbeOptions{Timeout: time.Millisecond * 1000, Expect: true},
+		Config{
+			Cmd:                     "sh",
+			Args:                    []string{"-c", "printf 'service version: 1.2.3\\nstatus: ok\\n'"},
+			StdoutRegex:             `version:\s+(\d+\.\d+\.\d+)`,
+			StdoutRegexCaptureGroup: 1,
+		},
+	)
+	if err != nil {
+		t.Fatalf("constructor returned error: %v", err)
+	}
+
+	ctx := model.ContextWithLogger(context.Background(), model.NewChainLogger(model.DefaultLogger, "stdout capture"))
+	if !p.Start(ctx) {
+		t.Fatal("probe should return true")
+	}
+
+	result := p.Result()
+	data, ok := result.Data.(ResultData)
+	if !ok {
+		t.Fatalf("probe data should be ResultData, got %T", result.Data)
+	}
+	if data.ExitCode != 0 {
+		t.Fatalf("exit code should be 0, got %d", data.ExitCode)
+	}
+	if data.Capture != "1.2.3" {
+		t.Fatalf("capture should be %q, got %q", "1.2.3", data.Capture)
+	}
+	p.Finish(ctx)
+}
+
+func Test_ConstructorWrongStdoutRegexCaptureGroup(t *testing.T) {
+	constructor := constructor{
+		probefactory.BaseConstructor{
+			Name: name,
+		},
+	}
+
+	_, err := constructor.NewProbe(
+		model.ProbeOptions{Timeout: time.Millisecond * 1000, Expect: true},
+		Config{
+			Cmd:                     "sh",
+			Args:                    []string{"-c", "printf test"},
+			StdoutRegex:             `version:\s+(\d+)`,
+			StdoutRegexCaptureGroup: 2,
+		},
+	)
+	if err == nil {
+		t.Fatal("constructor should return an error for invalid stdoutRegexCaptureGroup")
+	}
+}

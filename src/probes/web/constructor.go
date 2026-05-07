@@ -54,12 +54,27 @@ func (c constructor) configuration(conf any) (configuration Config, err error) {
 
 func (c *Config) compileBodyRegex() error {
 	if c.BodyRegex == "" {
+		if c.BodyRegexCaptureGroup > 0 {
+			return fmt.Errorf("bodyRegexCaptureGroup requires bodyRegex")
+		}
 		return nil
+	}
+	if c.BodyRegexCaptureGroup < 0 {
+		return fmt.Errorf("bodyRegexCaptureGroup should be greater than or equal to 0")
+	}
+	if c.BodyRegexInvert && c.BodyRegexCaptureGroup > 0 {
+		return fmt.Errorf("bodyRegexCaptureGroup cannot be used with bodyRegexInvert")
 	}
 
 	r, err := regexp.Compile(c.BodyRegex)
 	if err != nil {
 		return fmt.Errorf("wrong bodyRegex: %w", err)
+	}
+	if c.BodyRegexCaptureGroup > r.NumSubexp() {
+		return fmt.Errorf(
+			"bodyRegexCaptureGroup %d is out of range, regex has %d capture groups",
+			c.BodyRegexCaptureGroup, r.NumSubexp(),
+		)
 	}
 	c.bodyRegexp = r
 	return nil

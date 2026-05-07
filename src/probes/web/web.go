@@ -21,12 +21,18 @@ type Probe struct {
 }
 
 type Config struct {
-	HTTPStatus      int `default:"200"`
-	Urls            []string
-	FWMark          int    `json:"fwMark,omitempty"`
-	BodyRegex       string `json:"bodyRegex,omitempty"`
-	BodyRegexInvert bool   `json:"bodyRegexInvert,omitempty"`
-	bodyRegexp      *regexp.Regexp
+	HTTPStatus            int `default:"200"`
+	Urls                  []string
+	FWMark                int    `json:"fwMark,omitempty"`
+	BodyRegex             string `json:"bodyRegex,omitempty"`
+	BodyRegexInvert       bool   `json:"bodyRegexInvert,omitempty"`
+	BodyRegexCaptureGroup int    `json:"bodyRegexCaptureGroup,omitempty"`
+	bodyRegexp            *regexp.Regexp
+}
+
+type ResultData struct {
+	Timings  map[string]int    `json:"timings"`
+	Captures map[string]string `json:"captures,omitempty"`
 }
 
 var name = "web"
@@ -52,6 +58,7 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 	var timings model.Timings
 	var wg sync.WaitGroup
 	var mutex sync.Mutex
+	captures := make(map[string]string)
 	done := 0
 	for _, s := range c.Urls {
 		if u, e := url.Parse(s); e != nil {
@@ -107,12 +114,26 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 				err = fmt.Errorf("wrong response %v", r.StatusCode)
 				return
 			}
-			err = c.checkBody(r)
+			var capture string
+			capture, err = c.checkBody(r)
+			if err == nil && c.BodyRegexCaptureGroup > 0 {
+				mutex.Lock()
+				captures[s] = capture
+				mutex.Unlock()
+			}
 		}(s)
 	}
 	wg.Wait()
 	succ = done == len(c.Urls)
-	resultObject = timings.TimingsMs()
+
+	rd := ResultData{
+		Timings: timings.TimingsMs(),
+	}
+	if c.BodyRegexCaptureGroup > 0 {
+		rd.Captures = captures
+	}
+	resultObject = rd
+
 	return
 }
 
@@ -120,22 +141,29 @@ func (c *Probe) httpClient() http.Client {
 	return newHTTPClient(c.Timeout, c.FWMark)
 }
 
-func (c *Probe) checkBody(r *http.Response) error {
+func (c *Probe) checkBody(r *http.Response) (capture string, err error) {
 	if c.bodyRegexp == nil {
-		return nil
+		return
 	}
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		return fmt.Errorf("can't read response body: %w", err)
+		err = fmt.Errorf("can't read response body: %w", err)
+		return
 	}
 
-	matched := c.bodyRegexp.Match(body)
+	matches := c.bodyRegexp.FindSubmatch(body)
+	matched := len(matches) > 0
+	if matched && c.BodyRegexCaptureGroup > 0 {
+		capture = string(matches[c.BodyRegexCaptureGroup])
+	}
 	if matched == c.BodyRegexInvert {
 		if c.BodyRegexInvert {
-			return fmt.Errorf("body matches forbidden regex")
+			err = fmt.Errorf("body matches forbidden regex")
+			return
 		}
-		return fmt.Errorf("body doesn't match regex")
+		err = fmt.Errorf("body doesn't match regex")
+		return
 	}
-	return nil
+	return
 }
