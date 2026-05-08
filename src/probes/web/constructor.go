@@ -48,34 +48,34 @@ func (c constructor) configuration(conf any) (configuration Config, err error) {
 		return
 	}
 
-	err = configuration.compileBodyRegex()
+	err = configuration.compileRegex()
 	return
 }
 
-func (c *Config) compileBodyRegex() error {
-	if c.BodyRegex == "" {
-		if c.BodyRegexCaptureGroup > 0 {
-			return fmt.Errorf("bodyRegexCaptureGroup requires bodyRegex")
+func (c *Config) compileRegex() error {
+	if c.Regex == "" {
+		if c.RegexCaptureGroup > 0 {
+			return fmt.Errorf("regexCaptureGroup requires regex")
 		}
 		return nil
 	}
-	if c.BodyRegexCaptureGroup < 0 {
-		return fmt.Errorf("bodyRegexCaptureGroup should be greater than or equal to 0")
+	if c.RegexCaptureGroup < 0 {
+		return fmt.Errorf("regexCaptureGroup should be greater than or equal to 0")
 	}
-	if c.BodyRegexInvert && c.BodyRegexCaptureGroup > 0 {
-		return fmt.Errorf("bodyRegexCaptureGroup cannot be used with bodyRegexInvert")
+	if c.RegexInvert && c.RegexCaptureGroup > 0 {
+		return fmt.Errorf("regexCaptureGroup cannot be used with regexInvert")
 	}
 
-	r, err := regexp.Compile(c.BodyRegex)
+	r, err := regexp.Compile(c.Regex)
 	if err != nil {
-		return fmt.Errorf("wrong bodyRegex: %w", err)
+		return fmt.Errorf("wrong regex: %w", err)
 	}
-	if c.BodyRegexCaptureGroup > r.NumSubexp() {
+	if c.RegexCaptureGroup > r.NumSubexp() {
 		return fmt.Errorf(
-			"bodyRegexCaptureGroup %d is out of range, regex has %d capture groups",
-			c.BodyRegexCaptureGroup, r.NumSubexp(),
+			"regexCaptureGroup %d is out of range, regex has %d capture groups",
+			c.RegexCaptureGroup, r.NumSubexp(),
 		)
 	}
-	c.bodyRegexp = r
+	c.regexp = r
 	return nil
 }

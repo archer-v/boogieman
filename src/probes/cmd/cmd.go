@@ -55,6 +55,7 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 
 	if c.cmd != nil {
 		err = fmt.Errorf("another cmd is still running")
+		resultObject = ResultData{}
 		return
 	}
 
@@ -94,12 +95,14 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 			c.Log("Command should stay background but exited unexpectedly")
 			succ = false
 			err = ErrUnexpectedExit
+			resultObject = ResultData{ExitCode: finished.Exit}
 			return
 		}
 
 		if interrupted != ErrTimeout {
 			err = interrupted
 			succ = false
+			resultObject = ResultData{ExitCode: finished.Exit}
 			return
 		}
 
@@ -121,48 +124,60 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 			// channel is closed
 			c.Finish(ctx)
 		}(c.cmd)
+		resultObject = ResultData{ExitCode: finished.Exit}
 		return
 	}
 
 	if interrupted != nil {
 		err = interrupted
 		c.Finish(ctx)
-		return false, nil
+		resultObject = c.resultData(finished.Exit, false, "")
+		return false, resultObject
 	}
 
 	if finished.Exit != c.ExitCode {
 		err = fmt.Errorf("wrong exit code %v", finished.Exit)
 	}
-	stdoutMatch, capture := c.checkStdout(finished.Stdout)
-	if finished.Exit == c.ExitCode && !stdoutMatch {
-		if c.StdoutRegexInvert {
+	regexMatch, regexCondition, capture := c.checkStdout(finished.Stdout)
+	if finished.Exit == c.ExitCode && c.regexp != nil && !regexCondition && c.regexRequired() {
+		if c.RegexInvert {
 			err = fmt.Errorf("stdout matches forbidden regex")
 		} else {
 			err = fmt.Errorf("stdout doesn't match regex")
 		}
 	}
-	succ = (finished.Exit == c.ExitCode && stdoutMatch) == c.Expect
-	resultObject = finished.Exit
-	if c.StdoutRegexCaptureGroup > 0 {
-		resultObject = ResultData{
-			ExitCode: finished.Exit,
-			Capture:  capture,
-		}
-	}
+	regexSuccess := c.regexp == nil || !c.regexRequired() || regexCondition
+	succ = (finished.Exit == c.ExitCode && regexSuccess) == c.Expect
+	resultObject = c.resultData(finished.Exit, regexMatch, capture)
 	return
 }
 
-func (c *Probe) checkStdout(stdout []string) (matched bool, capture string) {
-	if c.stdoutRegexp == nil {
-		return true, ""
+func (c *Probe) resultData(exitCode int, regexMatch bool, capture string) ResultData {
+	data := ResultData{ExitCode: exitCode}
+	if c.regexp != nil {
+		data.Regex = &regexMatch
+	}
+	if c.RegexCaptureGroup > 0 {
+		data.Capture = &capture
+	}
+	return data
+}
+
+func (c *Probe) checkStdout(stdout []string) (matched bool, condition bool, capture string) {
+	if c.regexp == nil {
+		return false, true, ""
 	}
 
-	matches := c.stdoutRegexp.FindStringSubmatch(strings.Join(stdout, "\n"))
+	matches := c.regexp.FindStringSubmatch(strings.Join(stdout, "\n"))
 	matched = len(matches) > 0
-	if matched && c.StdoutRegexCaptureGroup > 0 {
-		capture = matches[c.StdoutRegexCaptureGroup]
+	if matched && c.RegexCaptureGroup > 0 {
+		capture = matches[c.RegexCaptureGroup]
 	}
-	return matched != c.StdoutRegexInvert, capture
+	return matched, matched != c.RegexInvert, capture
+}
+
+func (c *Probe) regexRequired() bool {
+	return c.Config.regexRequired()
 }
 
 func (c *Probe) Finisher(context.Context) {

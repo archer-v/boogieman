@@ -47,7 +47,7 @@ func (c constructor) configuration(conf any) (config Config, err error) {
 		err = model.ErrorConfig
 		return
 	}
-	if err = config.compileStdoutRegex(); err != nil {
+	if err = config.compileRegex(); err != nil {
 		return
 	}
 

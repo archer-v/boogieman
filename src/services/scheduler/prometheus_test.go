@@ -22,8 +22,10 @@ func Test_probeDataMetric(t *testing.T) {
 	var testString = "test"
 	type structData struct {
 		Timings  map[string]int    `json:"timings"`
+		Regex    map[string]bool   `json:"regex,omitempty"`
 		Captures map[string]string `json:"captures,omitempty"`
 		Capture  string            `json:"capture,omitempty"`
+		Empty    string            `json:"empty,omitempty"`
 		Ignored  string            `json:"-"`
 	}
 	cases := []testCase{
@@ -127,10 +129,16 @@ func Test_probeDataMetric(t *testing.T) {
 				Timings: map[string]int{
 					"https://example.com/": 42,
 				},
+				Regex: map[string]bool{
+					"https://example.com/":   true,
+					"https://empty.example/": false,
+				},
 				Captures: map[string]string{
-					"https://example.com/": "1.2.3",
+					"https://example.com/":   "1.2.3",
+					"https://empty.example/": "",
 				},
 				Capture: "1.2.3",
+				Empty:   "",
 				Ignored: "hidden",
 			},
 			expectedResult: []expectedResult{
@@ -142,6 +150,24 @@ func Test_probeDataMetric(t *testing.T) {
 				},
 				{
 					prometheus.GaugeValue,
+					float64(0),
+					[]string{"regex", "https://empty.example/"},
+					[]string{"field", "item"},
+				},
+				{
+					prometheus.GaugeValue,
+					float64(1),
+					[]string{"regex", "https://example.com/"},
+					[]string{"field", "item"},
+				},
+				{
+					prometheus.GaugeValue,
+					float64(0),
+					[]string{"captures", "https://empty.example/", ""},
+					[]string{"field", "item", "value"},
+				},
+				{
+					prometheus.GaugeValue,
 					float64(1),
 					[]string{"captures", "https://example.com/", "1.2.3"},
 					[]string{"field", "item", "value"},
@@ -150,6 +176,12 @@ func Test_probeDataMetric(t *testing.T) {
 					prometheus.GaugeValue,
 					float64(1),
 					[]string{"capture", "1.2.3"},
+					[]string{"field", "value"},
+				},
+				{
+					prometheus.GaugeValue,
+					float64(0),
+					[]string{"empty", ""},
 					[]string{"field", "value"},
 				},
 			},

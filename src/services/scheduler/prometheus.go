@@ -286,7 +286,7 @@ func probeMetrics(data any) (metrics []metricData) {
 			case reflectIsFloat(v.Kind()):
 				value = v.Float()
 			case reflectIsString(v.Kind()):
-				value = 1
+				value = stringMetricValue(v.String())
 				labels = append(labels, v.String())
 				labelNames = append(labelNames, "value")
 			default:
@@ -314,7 +314,7 @@ func probeMetrics(data any) (metrics []metricData) {
 	case reflectIsFloat(kind):
 		value = v.Float()
 	case kind == reflect.String:
-		value = 1
+		value = stringMetricValue(v.String())
 		labels = []string{v.String()}
 		labelNames = []string{"item"}
 	}
@@ -394,7 +394,7 @@ func probeStructMapMetrics(fieldName string, v reflect.Value) (metrics []metricD
 		case value.Kind() == reflect.Bool:
 			m.value = gbValue(value.Bool())
 		case value.Kind() == reflect.String:
-			m.value = 1
+			m.value = stringMetricValue(value.String())
 			m.labels = append(m.labels, value.String())
 			m.labelNames = append(m.labelNames, "value")
 		default:
@@ -419,13 +419,20 @@ func probeStructSimpleMetric(fieldName string, v reflect.Value) (metricData, boo
 	case reflectIsFloat(v.Kind()):
 		m.value = v.Float()
 	case v.Kind() == reflect.String:
-		m.value = 1
+		m.value = stringMetricValue(v.String())
 		m.labels = append(m.labels, v.String())
 		m.labelNames = append(m.labelNames, "value")
 	default:
 		return metricData{}, false
 	}
 	return m, true
+}
+
+func stringMetricValue(s string) float64 {
+	if s == "" {
+		return 0
+	}
+	return 1
 }
 
 func mapKeyString(v reflect.Value) string {

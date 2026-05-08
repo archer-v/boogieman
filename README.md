@@ -213,9 +213,10 @@ probe:
       - https://example.com/
     httpStatus: 200
     fwMark: 100
-    bodyRegex: "service version: [0-9]+\\.[0-9]+"
-    bodyRegexInvert: false
-    bodyRegexCaptureGroup: 1
+    regex: "service version: ([0-9]+\\.[0-9]+)"
+    regexInvert: false
+    regexRequired: true
+    regexCaptureGroup: 1
 ```
 
 URLs without a scheme are treated as HTTPS URLs.
@@ -224,9 +225,9 @@ URLs without a scheme are treated as HTTPS URLs.
 
 On Linux, `fwMark` sets `SO_MARK` on sockets opened by the web probe. This can be used with `ip rule` and policy routing. On non-Linux systems, `fwMark` is ignored and the probe uses the regular HTTP client behavior.
 
-If `bodyRegex` is set, the probe reads the response body and checks it against the regular expression after the endpoint returns an HTTP response. With `bodyRegexInvert: false`, the probe succeeds only when the expression matches. With `bodyRegexInvert: true`, the probe succeeds only when the expression does not match.
+If `regex` is set, the probe reads the response body and checks it against the regular expression after the endpoint returns an HTTP response. With `regexInvert: false`, the regexp condition is positive when the expression matches. With `regexInvert: true`, the regexp condition is positive when the expression does not match. `regexRequired` controls whether this condition affects the probe success; it defaults to `true`.
 
-If `bodyRegexCaptureGroup` is greater than `0`, the selected capture group is returned in the probe result data together with response timings. Capture groups cannot be used together with `bodyRegexInvert`.
+The regexp match result is exported in result data as a boolean map under `regex`. If `regexCaptureGroup` is greater than `0`, the selected capture group is returned in result data under `captures`. Capture groups cannot be used together with `regexInvert`. Capture entries are exported for every checked endpoint; when the regexp or capture group does not match, the capture value is an empty string and the Prometheus metric value is `0`.
 
 ### cmd
 
@@ -240,16 +241,17 @@ probe:
     cmd: ping -c 3 -i 0.1 -W 0.1 127.0.0.1
     exitCode: 0
     logDump: false
-    stdoutRegex: "bytes from"
-    stdoutRegexInvert: false
-    stdoutRegexCaptureGroup: 1
+    regex: "bytes from"
+    regexInvert: false
+    regexRequired: true
+    regexCaptureGroup: 1
 ```
 
 `stayBackground: true` means the command is expected to keep running after the startup timeout. If it exits earlier, the probe fails.
 
-If `stdoutRegex` is set, the probe checks the command stdout after the command exits and the exit code matches. With `stdoutRegexInvert: false`, the probe succeeds only when stdout matches the expression. With `stdoutRegexInvert: true`, the probe succeeds only when stdout does not match.
+If `regex` is set, the probe checks command stdout after the command exits. With `regexInvert: false`, the regexp condition is positive when stdout matches the expression. With `regexInvert: true`, the regexp condition is positive when stdout does not match. `regexRequired` controls whether this condition affects the probe success; it defaults to `true`.
 
-If `stdoutRegexCaptureGroup` is greater than `0`, the selected capture group is returned in the probe result data together with the exit code. Capture groups cannot be used together with `stdoutRegexInvert`.
+The regexp match result is exported in result data as `regex`. If `regexCaptureGroup` is greater than `0`, the selected capture group is returned in result data as `capture`. Capture groups cannot be used together with `regexInvert`. The capture field is exported even when the regexp or capture group does not match; in that case the value is an empty string and the Prometheus metric value is `0`.
 
 ### openvpn
 

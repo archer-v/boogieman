@@ -8,19 +8,21 @@ import (
 )
 
 type Config struct {
-	Cmd                     string // path to a cmd binary file
-	Args                    []string
-	ExitCode                int
-	LogDump                 bool
-	StdoutRegex             string `json:"stdoutRegex,omitempty"`
-	StdoutRegexInvert       bool   `json:"stdoutRegexInvert,omitempty"`
-	StdoutRegexCaptureGroup int    `json:"stdoutRegexCaptureGroup,omitempty"`
-	stdoutRegexp            *regexp.Regexp
+	Cmd               string // path to a cmd binary file
+	Args              []string
+	ExitCode          int
+	LogDump           bool
+	Regex             string `json:"regex,omitempty"`
+	RegexInvert       bool   `json:"regexInvert,omitempty"`
+	RegexRequired     *bool  `json:"regexRequired,omitempty"`
+	RegexCaptureGroup int    `json:"regexCaptureGroup,omitempty"`
+	regexp            *regexp.Regexp
 }
 
 type ResultData struct {
-	ExitCode int    `json:"exitCode"`
-	Capture  string `json:"capture,omitempty"`
+	ExitCode int     `json:"exitCode"`
+	Regex    *bool   `json:"regex,omitempty"`
+	Capture  *string `json:"capture,omitempty"`
 }
 
 func (c *Config) initWithString(str string) (err error) {
@@ -38,30 +40,34 @@ func (c *Config) initWithString(str string) (err error) {
 	return
 }
 
-func (c *Config) compileStdoutRegex() error {
-	if c.StdoutRegex == "" {
-		if c.StdoutRegexCaptureGroup > 0 {
-			return fmt.Errorf("stdoutRegexCaptureGroup requires stdoutRegex")
+func (c *Config) compileRegex() error {
+	if c.Regex == "" {
+		if c.RegexCaptureGroup > 0 {
+			return fmt.Errorf("regexCaptureGroup requires regex")
 		}
 		return nil
 	}
-	if c.StdoutRegexCaptureGroup < 0 {
-		return fmt.Errorf("stdoutRegexCaptureGroup should be greater than or equal to 0")
+	if c.RegexCaptureGroup < 0 {
+		return fmt.Errorf("regexCaptureGroup should be greater than or equal to 0")
 	}
-	if c.StdoutRegexInvert && c.StdoutRegexCaptureGroup > 0 {
-		return fmt.Errorf("stdoutRegexCaptureGroup cannot be used with stdoutRegexInvert")
+	if c.RegexInvert && c.RegexCaptureGroup > 0 {
+		return fmt.Errorf("regexCaptureGroup cannot be used with regexInvert")
 	}
 
-	r, err := regexp.Compile(c.StdoutRegex)
+	r, err := regexp.Compile(c.Regex)
 	if err != nil {
-		return fmt.Errorf("wrong stdoutRegex: %w", err)
+		return fmt.Errorf("wrong regex: %w", err)
 	}
-	if c.StdoutRegexCaptureGroup > r.NumSubexp() {
+	if c.RegexCaptureGroup > r.NumSubexp() {
 		return fmt.Errorf(
-			"stdoutRegexCaptureGroup %d is out of range, regex has %d capture groups",
-			c.StdoutRegexCaptureGroup, r.NumSubexp(),
+			"regexCaptureGroup %d is out of range, regex has %d capture groups",
+			c.RegexCaptureGroup, r.NumSubexp(),
 		)
 	}
-	c.stdoutRegexp = r
+	c.regexp = r
 	return nil
+}
+
+func (c Config) regexRequired() bool {
+	return c.RegexRequired == nil || *c.RegexRequired
 }
