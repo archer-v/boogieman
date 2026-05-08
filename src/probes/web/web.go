@@ -21,7 +21,7 @@ type Probe struct {
 }
 
 type Config struct {
-	HTTPStatus            int `default:"200"`
+	HTTPStatus            int
 	Urls                  []string
 	FWMark                int    `json:"fwMark,omitempty"`
 	BodyRegex             string `json:"bodyRegex,omitempty"`
@@ -31,8 +31,9 @@ type Config struct {
 }
 
 type ResultData struct {
-	Timings  map[string]int    `json:"timings"`
-	Captures map[string]string `json:"captures,omitempty"`
+	Timings    map[string]int    `json:"timings"`
+	HTTPStatus map[string]int    `json:"httpStatus"`
+	Captures   map[string]string `json:"captures,omitempty"`
 }
 
 var name = "web"
@@ -59,6 +60,7 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 	var wg sync.WaitGroup
 	var mutex sync.Mutex
 	captures := make(map[string]string)
+	httpStatus := make(map[string]int)
 	done := 0
 	for _, s := range c.Urls {
 		if u, e := url.Parse(s); e != nil {
@@ -86,7 +88,6 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 						mutex.Unlock()
 					}
 				} else {
-					timings.Set(s, dur)
 					if c.Expect {
 						mutex.Lock()
 						done++
@@ -110,24 +111,32 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 				}
 				return
 			}
-			if r.StatusCode != c.HTTPStatus {
-				err = fmt.Errorf("wrong response %v", r.StatusCode)
-				return
-			}
+			timings.Set(s, time.Since(t))
+			mutex.Lock()
+			httpStatus[s] = r.StatusCode
+			mutex.Unlock()
+
 			var capture string
-			capture, err = c.checkBody(r)
-			if err == nil && c.BodyRegexCaptureGroup > 0 {
+			var bodyErr error
+			capture, bodyErr = c.checkBody(r)
+			if bodyErr == nil && c.BodyRegexCaptureGroup > 0 {
 				mutex.Lock()
 				captures[s] = capture
 				mutex.Unlock()
 			}
+			if c.HTTPStatus != 0 && r.StatusCode != c.HTTPStatus {
+				err = fmt.Errorf("wrong response %v", r.StatusCode)
+				return
+			}
+			err = bodyErr
 		}(s)
 	}
 	wg.Wait()
 	succ = done == len(c.Urls)
 
 	rd := ResultData{
-		Timings: timings.TimingsMs(),
+		Timings:    timings.TimingsMs(),
+		HTTPStatus: httpStatus,
 	}
 	if c.BodyRegexCaptureGroup > 0 {
 		rd.Captures = captures

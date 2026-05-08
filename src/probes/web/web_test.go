@@ -194,6 +194,88 @@ func Test_RunnerBodyRegexCapture(t *testing.T) {
 	if data.Captures[server.URL] != "1.2.3" {
 		t.Fatalf("capture should be %q, got %q", "1.2.3", data.Captures[server.URL])
 	}
+	if data.HTTPStatus[server.URL] != http.StatusOK {
+		t.Fatalf("http status should be %d, got %d", http.StatusOK, data.HTTPStatus[server.URL])
+	}
+	if _, ok = data.Timings[server.URL]; !ok {
+		t.Fatal("timing should be exported")
+	}
+}
+
+func Test_RunnerHTTPStatusIsOptional(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusTeapot)
+		_, _ = w.Write([]byte("status: teapot"))
+	}))
+	defer server.Close()
+
+	p := New(
+		model.ProbeOptions{Timeout: time.Millisecond * 5000, Expect: true},
+		Config{
+			Urls: []string{server.URL},
+		},
+	)
+
+	ctx := model.ContextWithLogger(context.Background(), model.NewChainLogger(model.DefaultLogger, "optional status"))
+	if !p.Start(ctx) {
+		t.Fatal("probe should return true when HTTPStatus is 0 and endpoint returns an HTTP response")
+	}
+
+	result := p.Result()
+	data, ok := result.Data.(ResultData)
+	if !ok {
+		t.Fatalf("probe data should be ResultData, got %T", result.Data)
+	}
+	if data.HTTPStatus[server.URL] != http.StatusTeapot {
+		t.Fatalf("http status should be %d, got %d", http.StatusTeapot, data.HTTPStatus[server.URL])
+	}
+	if _, ok = data.Timings[server.URL]; !ok {
+		t.Fatal("timing should be exported")
+	}
+}
+
+func Test_RunnerReturnsDataOnFailedCondition(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte("service version: 1.2.3\nstatus: pending"))
+	}))
+	defer server.Close()
+
+	constructor := constructor{
+		probefactory.BaseConstructor{
+			Name: name,
+		},
+	}
+
+	p, err := constructor.NewProbe(
+		model.ProbeOptions{Timeout: time.Millisecond * 5000, Expect: true},
+		Config{
+			Urls:                  []string{server.URL},
+			HTTPStatus:            http.StatusOK,
+			BodyRegex:             `version:\s+(\d+\.\d+\.\d+)`,
+			BodyRegexCaptureGroup: 1,
+		},
+	)
+	if err != nil {
+		t.Fatalf("constructor returned error: %v", err)
+	}
+
+	ctx := model.ContextWithLogger(context.Background(), model.NewChainLogger(model.DefaultLogger, "failed condition data"))
+	if p.Start(ctx) {
+		t.Fatal("probe should return false because HTTP status does not match")
+	}
+
+	result := p.Result()
+	data, ok := result.Data.(ResultData)
+	if !ok {
+		t.Fatalf("probe data should be ResultData, got %T", result.Data)
+	}
+	if data.HTTPStatus[server.URL] != http.StatusAccepted {
+		t.Fatalf("http status should be %d, got %d", http.StatusAccepted, data.HTTPStatus[server.URL])
+	}
+	if data.Captures[server.URL] != "1.2.3" {
+		t.Fatalf("capture should be %q, got %q", "1.2.3", data.Captures[server.URL])
+	}
 	if _, ok = data.Timings[server.URL]; !ok {
 		t.Fatal("timing should be exported")
 	}

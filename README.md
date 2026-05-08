@@ -220,9 +220,11 @@ probe:
 
 URLs without a scheme are treated as HTTPS URLs.
 
+`httpStatus` is optional. If it is omitted or set to `0`, the HTTP status code is not checked and does not affect probe success. Response timings and returned HTTP status codes are exported whenever the endpoint returns an HTTP response, even when another probe condition fails.
+
 On Linux, `fwMark` sets `SO_MARK` on sockets opened by the web probe. This can be used with `ip rule` and policy routing. On non-Linux systems, `fwMark` is ignored and the probe uses the regular HTTP client behavior.
 
-If `bodyRegex` is set, the probe reads the response body and checks it against the regular expression after the HTTP status check succeeds. With `bodyRegexInvert: false`, the probe succeeds only when the expression matches. With `bodyRegexInvert: true`, the probe succeeds only when the expression does not match.
+If `bodyRegex` is set, the probe reads the response body and checks it against the regular expression after the endpoint returns an HTTP response. With `bodyRegexInvert: false`, the probe succeeds only when the expression matches. With `bodyRegexInvert: true`, the probe succeeds only when the expression does not match.
 
 If `bodyRegexCaptureGroup` is greater than `0`, the selected capture group is returned in the probe result data together with response timings. Capture groups cannot be used together with `bodyRegexInvert`.
 
