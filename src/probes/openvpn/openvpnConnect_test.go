@@ -4,11 +4,12 @@ import (
 	"boogieman/src/model"
 	"context"
 	"fmt"
-	"github.com/go-cmd/cmd"
 	"log"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/go-cmd/cmd"
 )
 
 var (
@@ -40,11 +41,11 @@ func Test_Runner(t *testing.T) {
 			false,
 		},
 		{
-			Config{ConfigData: testReadConfig(openvpnClientTestConfigPath)},
+			Config{ConfigData: testReadConfig(openvpnClientTestConfigPath), LogDump: true},
 			true,
 		},
 		{
-			Config{ConfigFile: openvpnClientTestConfigPath},
+			Config{ConfigFile: openvpnClientTestConfigPath, LogDump: true},
 			true,
 		},
 	}
@@ -73,7 +74,7 @@ func Test_Runner(t *testing.T) {
 }
 
 func testStartOpenvpnServer(ctx context.Context) (runner *cmd.Cmd) {
-	runner, err := openvpnStart(ctx, openvpnServerTestConfigPath, 1*time.Second, false)
+	runner, err := openvpnStart(ctx, openvpnServerTestConfigPath, 1*time.Second, true)
 	if err != nil {
 		log.Printf("can't start openvpn server: %v", err)
 		runner = nil
