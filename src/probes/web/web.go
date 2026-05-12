@@ -21,21 +21,25 @@ type Probe struct {
 }
 
 type Config struct {
-	HTTPStatus        int
-	Urls              []string
-	FWMark            int    `json:"fwMark,omitempty"`
-	Regex             string `json:"regex,omitempty"`
-	RegexInvert       bool   `json:"regexInvert,omitempty"`
-	RegexRequired     *bool  `json:"regexRequired,omitempty"`
-	RegexCaptureGroup int    `json:"regexCaptureGroup,omitempty"`
-	regexp            *regexp.Regexp
+	HTTPStatus         int
+	Urls               []string
+	FWMark             int    `json:"fwMark,omitempty"`
+	Regex              string `json:"regex,omitempty"`
+	RegexInvert        bool   `json:"regexInvert,omitempty"`
+	RegexRequired      *bool  `json:"regexRequired,omitempty"`
+	RegexCaptureGroup  int    `json:"regexCaptureGroup,omitempty"`
+	CaptureRegex       string `json:"captureRegex,omitempty"`
+	CaptureRegexInvert bool   `json:"captureRegexInvert,omitempty"`
+	regexp             *regexp.Regexp
+	captureRegexp      *regexp.Regexp
 }
 
 type ResultData struct {
-	Timings    map[string]int    `json:"timings"`
-	HTTPStatus map[string]int    `json:"httpStatus"`
-	Regex      map[string]bool   `json:"regex,omitempty"`
-	Captures   map[string]string `json:"captures,omitempty"`
+	Timings        map[string]int    `json:"timings"`
+	HTTPStatus     map[string]int    `json:"httpStatus"`
+	Regex          map[string]bool   `json:"regex,omitempty"`
+	Captures       map[string]string `json:"captures,omitempty"`
+	CaptureMatches map[string]bool   `json:"captureMatches,omitempty"`
 }
 
 var name = "web"
@@ -62,6 +66,7 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 	var wg sync.WaitGroup
 	var mutex sync.Mutex
 	captures := make(map[string]string)
+	captureMatches := make(map[string]bool)
 	httpStatus := make(map[string]int)
 	regex := make(map[string]bool)
 	done := 0
@@ -115,21 +120,20 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 				return
 			}
 			timings.Set(s, time.Since(t))
+
+			matched, capture, captureMatched, bodyErr := c.checkBody(r)
 			mutex.Lock()
 			httpStatus[s] = r.StatusCode
-			mutex.Unlock()
-
-			matched, capture, bodyErr := c.checkBody(r)
 			if c.regexp != nil {
-				mutex.Lock()
 				regex[s] = matched
-				mutex.Unlock()
 			}
 			if c.RegexCaptureGroup > 0 {
-				mutex.Lock()
 				captures[s] = capture
-				mutex.Unlock()
 			}
+			if captureMatched != nil {
+				captureMatches[s] = *captureMatched
+			}
+			mutex.Unlock()
 			if c.HTTPStatus != 0 && r.StatusCode != c.HTTPStatus {
 				err = fmt.Errorf("wrong response %v", r.StatusCode)
 				return
@@ -150,6 +154,9 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 	if c.RegexCaptureGroup > 0 {
 		rd.Captures = captures
 	}
+	if c.captureRegexp != nil {
+		rd.CaptureMatches = captureMatches
+	}
 	resultObject = rd
 
 	return
@@ -159,7 +166,7 @@ func (c *Probe) httpClient() http.Client {
 	return newHTTPClient(c.Timeout, c.FWMark)
 }
 
-func (c *Probe) checkBody(r *http.Response) (matched bool, capture string, err error) {
+func (c *Probe) checkBody(r *http.Response) (matched bool, capture string, captureMatched *bool, err error) {
 	if c.regexp == nil {
 		return
 	}
@@ -174,6 +181,18 @@ func (c *Probe) checkBody(r *http.Response) (matched bool, capture string, err e
 	matched = len(matches) > 0
 	if matched && c.RegexCaptureGroup > 0 {
 		capture = string(matches[c.RegexCaptureGroup])
+	}
+	if c.captureRegexp != nil {
+		cm := c.captureRegexp.MatchString(capture)
+		captureMatched = &cm
+		if cm == c.CaptureRegexInvert {
+			if c.CaptureRegexInvert {
+				err = fmt.Errorf("capture matches forbidden regex")
+				return
+			}
+			err = fmt.Errorf("capture doesn't match regex")
+			return
+		}
 	}
 	if !c.regexRequired() {
 		return

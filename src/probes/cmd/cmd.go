@@ -131,14 +131,14 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 	if interrupted != nil {
 		err = interrupted
 		c.Finish(ctx)
-		resultObject = c.resultData(finished.Exit, false, "")
+		resultObject = c.resultData(finished.Exit, false, "", false)
 		return false, resultObject
 	}
 
 	if finished.Exit != c.ExitCode {
 		err = fmt.Errorf("wrong exit code %v", finished.Exit)
 	}
-	regexMatch, regexCondition, capture := c.checkStdout(finished.Stdout)
+	regexMatch, regexCondition, capture, captureMatch, captureCondition := c.checkStdout(finished.Stdout)
 	if finished.Exit == c.ExitCode && c.regexp != nil && !regexCondition && c.regexRequired() {
 		if c.RegexInvert {
 			err = fmt.Errorf("stdout matches forbidden regex")
@@ -146,13 +146,21 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 			err = fmt.Errorf("stdout doesn't match regex")
 		}
 	}
+	if finished.Exit == c.ExitCode && c.captureRegexp != nil && !captureCondition {
+		if c.CaptureRegexInvert {
+			err = fmt.Errorf("capture matches forbidden regex")
+		} else {
+			err = fmt.Errorf("capture doesn't match regex")
+		}
+	}
 	regexSuccess := c.regexp == nil || !c.regexRequired() || regexCondition
-	succ = (finished.Exit == c.ExitCode && regexSuccess) == c.Expect
-	resultObject = c.resultData(finished.Exit, regexMatch, capture)
+	captureSuccess := c.captureRegexp == nil || captureCondition
+	succ = (finished.Exit == c.ExitCode && regexSuccess && captureSuccess) == c.Expect
+	resultObject = c.resultData(finished.Exit, regexMatch, capture, captureMatch)
 	return
 }
 
-func (c *Probe) resultData(exitCode int, regexMatch bool, capture string) ResultData {
+func (c *Probe) resultData(exitCode int, regexMatch bool, capture string, captureMatch bool) ResultData {
 	data := ResultData{ExitCode: exitCode}
 	if c.regexp != nil {
 		data.Regex = &regexMatch
@@ -160,12 +168,23 @@ func (c *Probe) resultData(exitCode int, regexMatch bool, capture string) Result
 	if c.RegexCaptureGroup > 0 {
 		data.Capture = &capture
 	}
+	if c.captureRegexp != nil {
+		data.CaptureMatches = &captureMatch
+	}
 	return data
 }
 
-func (c *Probe) checkStdout(stdout []string) (matched bool, condition bool, capture string) {
+func (c *Probe) checkStdout(stdout []string) (
+	matched bool,
+	condition bool,
+	capture string,
+	captureMatched bool,
+	captureCondition bool,
+) {
+	captureCondition = true
 	if c.regexp == nil {
-		return false, true, ""
+		condition = true
+		return
 	}
 
 	matches := c.regexp.FindStringSubmatch(strings.Join(stdout, "\n"))
@@ -173,7 +192,12 @@ func (c *Probe) checkStdout(stdout []string) (matched bool, condition bool, capt
 	if matched && c.RegexCaptureGroup > 0 {
 		capture = matches[c.RegexCaptureGroup]
 	}
-	return matched, matched != c.RegexInvert, capture
+	condition = matched != c.RegexInvert
+	if c.captureRegexp != nil {
+		captureMatched = c.captureRegexp.MatchString(capture)
+		captureCondition = captureMatched != c.CaptureRegexInvert
+	}
+	return
 }
 
 func (c *Probe) regexRequired() bool {

@@ -57,6 +57,9 @@ func (c *Config) compileRegex() error {
 		if c.RegexCaptureGroup > 0 {
 			return fmt.Errorf("regexCaptureGroup requires regex")
 		}
+		if c.CaptureRegex != "" {
+			return fmt.Errorf("captureRegex requires regex")
+		}
 		return nil
 	}
 	if c.RegexCaptureGroup < 0 {
@@ -64,6 +67,9 @@ func (c *Config) compileRegex() error {
 	}
 	if c.RegexInvert && c.RegexCaptureGroup > 0 {
 		return fmt.Errorf("regexCaptureGroup cannot be used with regexInvert")
+	}
+	if c.CaptureRegex != "" && c.RegexCaptureGroup <= 0 {
+		return fmt.Errorf("captureRegex requires regexCaptureGroup")
 	}
 
 	r, err := regexp.Compile(c.Regex)
@@ -77,5 +83,12 @@ func (c *Config) compileRegex() error {
 		)
 	}
 	c.regexp = r
+	if c.CaptureRegex != "" {
+		cr, err := regexp.Compile(c.CaptureRegex)
+		if err != nil {
+			return fmt.Errorf("wrong captureRegex: %w", err)
+		}
+		c.captureRegexp = cr
+	}
 	return nil
 }

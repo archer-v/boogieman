@@ -411,6 +411,139 @@ func Test_RunnerRegexCaptureAddsEmptyValueWhenNotMatched(t *testing.T) {
 	p.Finish(ctx)
 }
 
+func Test_RunnerCaptureRegex(t *testing.T) {
+	constructor := constructor{
+		probefactory.BaseConstructor{
+			Name: name,
+		},
+	}
+
+	type testCase struct {
+		name           string
+		config         Config
+		expectedResult bool
+		expectedMatch  bool
+	}
+
+	cases := []testCase{
+		{
+			name: "capture regex matches",
+			config: Config{
+				Cmd:               "sh",
+				Args:              []string{"-c", "printf 'service version: 1.2.3\\nstatus: ok\\n'"},
+				Regex:             `version:\s+(\d+\.\d+\.\d+)`,
+				RegexCaptureGroup: 1,
+				CaptureRegex:      `^1\.2\.`,
+			},
+			expectedResult: true,
+			expectedMatch:  true,
+		},
+		{
+			name: "capture regex does not match",
+			config: Config{
+				Cmd:               "sh",
+				Args:              []string{"-c", "printf 'service version: 1.2.3\\nstatus: ok\\n'"},
+				Regex:             `version:\s+(\d+\.\d+\.\d+)`,
+				RegexCaptureGroup: 1,
+				CaptureRegex:      `^2\.`,
+			},
+			expectedResult: false,
+			expectedMatch:  false,
+		},
+		{
+			name: "inverted capture regex succeeds without match",
+			config: Config{
+				Cmd:                "sh",
+				Args:               []string{"-c", "printf 'service version: 1.2.3\\nstatus: ok\\n'"},
+				Regex:              `version:\s+(\d+\.\d+\.\d+)`,
+				RegexCaptureGroup:  1,
+				CaptureRegex:       `^2\.`,
+				CaptureRegexInvert: true,
+			},
+			expectedResult: true,
+			expectedMatch:  false,
+		},
+		{
+			name: "inverted capture regex fails on match",
+			config: Config{
+				Cmd:                "sh",
+				Args:               []string{"-c", "printf 'service version: 1.2.3\\nstatus: ok\\n'"},
+				Regex:              `version:\s+(\d+\.\d+\.\d+)`,
+				RegexCaptureGroup:  1,
+				CaptureRegex:       `^1\.2\.`,
+				CaptureRegexInvert: true,
+			},
+			expectedResult: false,
+			expectedMatch:  true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			p, err := constructor.NewProbe(
+				model.ProbeOptions{Timeout: time.Millisecond * 1000, Expect: true},
+				c.config,
+			)
+			if err != nil {
+				t.Fatalf("constructor returned error: %v", err)
+			}
+
+			ctx := model.ContextWithLogger(context.Background(), model.NewChainLogger(model.DefaultLogger, c.name))
+			if p.Start(ctx) != c.expectedResult {
+				t.Fatalf("probe should return %v", c.expectedResult)
+			}
+
+			result := p.Result()
+			data, ok := result.Data.(ResultData)
+			if !ok {
+				t.Fatalf("probe data should be ResultData, got %T", result.Data)
+			}
+			if data.Capture == nil || *data.Capture != "1.2.3" {
+				t.Fatalf("capture should be %q, got %v", "1.2.3", data.Capture)
+			}
+			if data.CaptureMatches == nil || *data.CaptureMatches != c.expectedMatch {
+				t.Fatalf("capture regex result should be %v", c.expectedMatch)
+			}
+			p.Finish(ctx)
+		})
+	}
+}
+
+func Test_ConstructorWrongCaptureRegex(t *testing.T) {
+	constructor := constructor{
+		probefactory.BaseConstructor{
+			Name: name,
+		},
+	}
+
+	_, err := constructor.NewProbe(
+		model.ProbeOptions{Timeout: time.Millisecond * 1000, Expect: true},
+		Config{
+			Cmd:               "sh",
+			Args:              []string{"-c", "printf test"},
+			Regex:             `version:\s+(\d+)`,
+			RegexCaptureGroup: 1,
+			CaptureRegex:      "[",
+		},
+	)
+	if err == nil {
+		t.Fatal("constructor should return an error for invalid captureRegex")
+	}
+
+	_, err = constructor.NewProbe(
+		model.ProbeOptions{Timeout: time.Millisecond * 1000, Expect: true},
+		Config{
+			Cmd:          "sh",
+			Args:         []string{"-c", "printf test"},
+			Regex:        `version:\s+(\d+)`,
+			CaptureRegex: `^\d+$`,
+		},
+	)
+	if err == nil {
+		t.Fatal("constructor should return an error when captureRegex has no regexCaptureGroup")
+	}
+}
+
 func Test_ConstructorWrongRegexCaptureGroup(t *testing.T) {
 	constructor := constructor{
 		probefactory.BaseConstructor{

@@ -8,21 +8,25 @@ import (
 )
 
 type Config struct {
-	Cmd               string // path to a cmd binary file
-	Args              []string
-	ExitCode          int
-	LogDump           bool
-	Regex             string `json:"regex,omitempty"`
-	RegexInvert       bool   `json:"regexInvert,omitempty"`
-	RegexRequired     *bool  `json:"regexRequired,omitempty"`
-	RegexCaptureGroup int    `json:"regexCaptureGroup,omitempty"`
-	regexp            *regexp.Regexp
+	Cmd                string // path to a cmd binary file
+	Args               []string
+	ExitCode           int
+	LogDump            bool
+	Regex              string `json:"regex,omitempty"`
+	RegexInvert        bool   `json:"regexInvert,omitempty"`
+	RegexRequired      *bool  `json:"regexRequired,omitempty"`
+	RegexCaptureGroup  int    `json:"regexCaptureGroup,omitempty"`
+	CaptureRegex       string `json:"captureRegex,omitempty"`
+	CaptureRegexInvert bool   `json:"captureRegexInvert,omitempty"`
+	regexp             *regexp.Regexp
+	captureRegexp      *regexp.Regexp
 }
 
 type ResultData struct {
-	ExitCode int     `json:"exitCode"`
-	Regex    *bool   `json:"regex,omitempty"`
-	Capture  *string `json:"capture,omitempty"`
+	ExitCode       int     `json:"exitCode"`
+	Regex          *bool   `json:"regex,omitempty"`
+	Capture        *string `json:"capture,omitempty"`
+	CaptureMatches *bool   `json:"captureMatches,omitempty"`
 }
 
 func (c *Config) initWithString(str string) (err error) {
@@ -45,6 +49,9 @@ func (c *Config) compileRegex() error {
 		if c.RegexCaptureGroup > 0 {
 			return fmt.Errorf("regexCaptureGroup requires regex")
 		}
+		if c.CaptureRegex != "" {
+			return fmt.Errorf("captureRegex requires regex")
+		}
 		return nil
 	}
 	if c.RegexCaptureGroup < 0 {
@@ -52,6 +59,9 @@ func (c *Config) compileRegex() error {
 	}
 	if c.RegexInvert && c.RegexCaptureGroup > 0 {
 		return fmt.Errorf("regexCaptureGroup cannot be used with regexInvert")
+	}
+	if c.CaptureRegex != "" && c.RegexCaptureGroup <= 0 {
+		return fmt.Errorf("captureRegex requires regexCaptureGroup")
 	}
 
 	r, err := regexp.Compile(c.Regex)
@@ -65,6 +75,13 @@ func (c *Config) compileRegex() error {
 		)
 	}
 	c.regexp = r
+	if c.CaptureRegex != "" {
+		cr, err := regexp.Compile(c.CaptureRegex)
+		if err != nil {
+			return fmt.Errorf("wrong captureRegex: %w", err)
+		}
+		c.captureRegexp = cr
+	}
 	return nil
 }
 
