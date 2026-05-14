@@ -5,6 +5,7 @@ import (
 	"boogieman/src/probefactory"
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -288,6 +289,66 @@ func Test_RunnerReturnsDataOnFailedCondition(t *testing.T) {
 	}
 	if _, ok = data.Timings[server.URL]; !ok {
 		t.Fatal("timing should be exported")
+	}
+}
+
+func Test_RunnerReturnsDataOnConnectionFailure(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen failed: %v", err)
+	}
+	url := "http://" + listener.Addr().String()
+	if err = listener.Close(); err != nil {
+		t.Fatalf("listener close failed: %v", err)
+	}
+
+	constructor := constructor{
+		probefactory.BaseConstructor{
+			Name: name,
+		},
+	}
+
+	p, err := constructor.NewProbe(
+		model.ProbeOptions{Timeout: time.Millisecond * 5000, Expect: true},
+		Config{
+			Urls:              []string{url},
+			Regex:             `version:\s+(\d+\.\d+\.\d+)`,
+			RegexCaptureGroup: 1,
+			CaptureRegex:      `^1\.2\.`,
+		},
+	)
+	if err != nil {
+		t.Fatalf("constructor returned error: %v", err)
+	}
+
+	ctx := model.ContextWithLogger(context.Background(), model.NewChainLogger(model.DefaultLogger, "connection failure data"))
+	if p.Start(ctx) {
+		t.Fatal("probe should return false because connection fails")
+	}
+
+	result := p.Result()
+	data, ok := result.Data.(ResultData)
+	if !ok {
+		t.Fatalf("probe data should be ResultData, got %T", result.Data)
+	}
+	if data.Regex[url] {
+		t.Fatal("regex result should be false")
+	}
+	capture, ok := data.Captures[url]
+	if !ok {
+		t.Fatal("capture should be exported even when connection fails")
+	}
+	if capture != "" {
+		t.Fatalf("capture should be empty, got %q", capture)
+	}
+	if data.CaptureMatches[url] {
+		t.Fatal("capture match should be false")
+	}
+	if _, ok = data.HTTPStatus[url]; ok {
+		t.Fatal("http status should not be exported when endpoint does not respond")
+	}
+	if _, ok = data.Timings[url]; ok {
+		t.Fatal("timing should not be exported when endpoint does not respond")
 	}
 }
 

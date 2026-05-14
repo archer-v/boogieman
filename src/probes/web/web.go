@@ -69,6 +69,17 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 	captureMatches := make(map[string]bool)
 	httpStatus := make(map[string]int)
 	regex := make(map[string]bool)
+	setFailedData := func(s string) {
+		if c.regexp != nil {
+			regex[s] = false
+		}
+		if c.RegexCaptureGroup > 0 {
+			captures[s] = ""
+		}
+		if c.captureRegexp != nil {
+			captureMatches[s] = false
+		}
+	}
 	done := 0
 	for _, s := range c.Urls {
 		if u, e := url.Parse(s); e != nil {
@@ -117,6 +128,9 @@ func (c *Probe) Runner(ctx context.Context) (succ bool, resultObject any) {
 				} else {
 					err = fmt.Errorf("http error %w", err)
 				}
+				mutex.Lock()
+				setFailedData(s)
+				mutex.Unlock()
 				return
 			}
 			timings.Set(s, time.Since(t))
